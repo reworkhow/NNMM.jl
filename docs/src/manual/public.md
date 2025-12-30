@@ -1,7 +1,6 @@
-# Public functions
+# Public Functions
 
 Documentation for NNMM.jl's public interface. Below are functions available to general users.
-
 
 ## Index
 
@@ -10,21 +9,24 @@ Pages = ["public.md"]
 Modules = [NNMM]
 ```
 
-## Public Interface
+## NNMM Functions
+
+### Core Types
 
 ```@docs
-build_model
-get_pedigree
-get_genotypes
-set_covariate
-set_random
-runMCMC
-outputEBV
-outputMCMCsamples
-showMME
-solve
+Layer
+Equation
 ```
 
+### Main Functions
+
 ```@docs
-GWAS
+runNNMM
+```
+
+## Utility Functions
+
+```@docs
+get_pedigree
+get_genotypes
 ```

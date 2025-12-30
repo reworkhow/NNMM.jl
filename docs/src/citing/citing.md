@@ -2,31 +2,32 @@
 
 ## Software
 
-* Cheng, H., Fernando, R. L., and Garrick, D. J. 2018 NNMM: Julia implementation of whole-genome analysis software. Proceedings of the World Congress on Genetics Applied to Livestock Production,11.859. Auckland, New Zealand.
+If you use NNMM.jl, please cite:
+
+* Zhao, T., Zeng, J., & Cheng, H. (2022). Extend mixed models to multilayer neural networks for genomic prediction including intermediate omics data. *GENETICS*, iyac034. https://doi.org/10.1093/genetics/iyac034
+
+* Zhao, T., Fernando, R., & Cheng, H. (2021). Interpretable artificial neural networks incorporating Bayesian alphabet models for genome-wide prediction and association studies. *G3 Genes|Genomes|Genetics*, jkab228. https://doi.org/10.1093/g3journal/jkab228
 
 ## Methods
 
-### single-trait BayesA
-* Meuwissen T, Hayes B, Goddard M. 2001 Prediction of total genetic value using genome-wide dense marker maps. Genetics, 157:1819–1829.
+### Neural Network Mixed Models (NNMM)
 
-### single-trait BayesB
-* Meuwissen T, Hayes B, Goddard M. 2001 Prediction of total genetic value using genome-wide dense marker maps. Genetics, 157:1819–1829.
-* Cheng H, Garrick D, Fernando R. 2015 A fast and efficient Gibbs sampler for BayesB in whole-genome analyses. Genet Sel Evol, 47:80.
+* Zhao T, Zeng J, Cheng H. 2022. Extend mixed models to multilayer neural networks for genomic prediction including intermediate omics data. GENETICS, iyac034.
 
-### single-trait BayesC
-* Habier D, Fernando R, Kizilkaya K, Garrick D. 2011 Extension of the bayesian alphabet for genomic selection. BMC Bioinformatics, 12(1), 186.
+* Zhao T, Fernando R, Cheng H. 2021. Interpretable artificial neural networks incorporating Bayesian alphabet models for genome-wide prediction and association studies. G3 Genes|Genomes|Genetics, jkab228.
 
-### single-trait Bayesian LASSO
-* Gianola, D., & Fernando, R. L. (2019). A Multiple-Trait Bayesian Lasso for Genome-Enabled Analysis and Prediction of Complex Traits. Genetics, 214(2), genetics.302934.2019–331.
+### Bayesian Alphabet Methods
 
-### multi-trait Bayesian Alphabet
-* Cheng H, Kizilkaya K, Zeng J, Garrick D, Fernando R 2018 Genomic Prediction from Multiple-Trait Bayesian Regression Methods Using Mixture Priors. Genetics, 209(1): 89-103.
+* Meuwissen T, Hayes B, Goddard M. 2001. Prediction of total genetic value using genome-wide dense marker maps. Genetics, 157:1819–1829.
 
-### single-step Bayesian Alphabet
-* Fernando R, Dekkers J,Garrick D. 2015 A class of Bayesian methods to combine large numbers of genotyped and non-genotyped animals for whole-genome analyses. Genetics Selection Evolution, 46(1), 50.
+* Habier D, Fernando R, Kizilkaya K, Garrick D. 2011. Extension of the bayesian alphabet for genomic selection. BMC Bioinformatics, 12(1), 186.
 
-* Fernando, R. L., Cheng, H., Golden, B. L., & Garrick, D. J. (2016). Computational strategies for alternative single-step Bayesian regression models with large numbers of genotyped and non-genotyped animals. Genetics Selection Evolution, 48(1), 96.
+* Cheng H, Garrick D, Fernando R. 2015. A fast and efficient Gibbs sampler for BayesB in whole-genome analyses. Genet Sel Evol, 47:80.
 
-### GWAS
-* Fernando R, Garrick D. 2013 Bayesian methods applied to GWAS. Methods Mol Biol., 1019:237–274.
-* Fernando, R., Toosi, A., Wolc, A., Garrick, D., & Dekkers, J. (2017). Application of Whole-Genome Prediction Methods for Genome-Wide Association Studies: A Bayesian Approach. Journal of Agricultural, Biological and Environmental Statistics, 57(4), 1–22.
+* Cheng H, Kizilkaya K, Zeng J, Garrick D, Fernando R. 2018. Genomic Prediction from Multiple-Trait Bayesian Regression Methods Using Mixture Priors. Genetics, 209(1): 89-103.
+
+### Single-step Methods
+
+* Fernando R, Dekkers J, Garrick D. 2015. A class of Bayesian methods to combine large numbers of genotyped and non-genotyped animals for whole-genome analyses. Genetics Selection Evolution, 46(1), 50.
+
+* Fernando R, Cheng H, Golden B, Garrick D. 2016. Computational strategies for alternative single-step Bayesian regression models with large numbers of genotyped and non-genotyped animals. Genetics Selection Evolution, 48(1), 96.

@@ -1,36 +1,25 @@
 using Documenter, NNMM
 
 makedocs(
-    modules = [NNMM,NNMM.Datasets,NNMM.PedModule],
-    doctest=false,
-    clean  =true,
-#    format = Documenter.HTML(analytics = "UA-90474609-3",
-#                             assets = ["assets/favicon.ico"],
-#                             canonical="https://docs.juliadiffeq.org/stable/"),
+    modules = [NNMM, NNMM.Datasets, NNMM.PedModule],
+    doctest = false,
+    clean = true,
     sitename = "NNMM.jl",
-    authors = "Hao Cheng, Rohan Fernando, Dorian Garrick and contributors.",
+    authors = "Hao Cheng, Tianjing Zhao, Rohan Fernando, Dorian Garrick and contributors.",
     pages = Any[
         "Home" => "index.md",
-        "Some Theory" => "theory/theory.md",
-        "Citing" => "citing/citing.md",
+        "Mixed Effects Neural Networks (NNMM)" => Any[
+            "Part 1. Introduction" => "nnmm/Part1_introduction.md",
+            "Part 2. NNMM" => "nnmm/Part2_NNMM.md",
+            "Part 3. NNMM with intermediate omics" => "nnmm/Part3_NNMMwithIntermediateOmics.md",
+            "Part 4. Partial connected neural network" => "nnmm/Part4_PartialConnectedNeuralNetwork.md",
+            "Part 5. User-defined nonlinear function" => "nnmm/Part5_UserDefinedNonlinearFunction.md",
+        ],
         "Manual" => Any[
             "Get Started" => "manual/getstarted.md",
-            "Workflow" => "manual/workflow.md",
-            "Public" => "manual/public.md",
-            "Internals" => "manual/internals.md"
-            ],
-        "Mixed Effects Neural Networks (NNMM)" => Any[
-                    "Part 1. Introduction" => "nnmm/Part1_introduction.md",
-                    "Part 2. NNMM" => "nnmm/Part2_NNMM.md",
-                    "Part 3. NNMM with intermediate omics" => "nnmm/Part3_NNMMwithIntermediateOmics.md",
-                    "Part 4. Partial connected neural network" => "nnmm/Part4_PartialConnectedNeuralNetwork.md",
-                    "Part 5. User-defined nonlinear function" => "nnmm/Part5_UserDefinedNonlinearFunction.md"
-                    ],
-        "Examples" => Any[
-            "Examples" => "examples/examples.md"
+            "Public Functions" => "manual/public.md",
         ],
-        "Frequently Asked Questions" => "FrequentlyAskedQuestions/FrequentlyAskedQuestions.md",
-
+        "Citing" => "citing/citing.md",
     ],
 )
 

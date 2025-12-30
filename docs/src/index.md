@@ -1,70 +1,98 @@
 
 ![NNMM](assets/NNMM.png)
 
-NNMM is a well-documented software platform based on Julia and an interactive Jupyter notebook for analyses of general
-univariate and multivariate Bayesian mixed effects models.  These models are especially useful for, but not limited to,
-routine single-trait and multi-trait genomic prediction and genome-wide association studies using either complete or incomplete
-genomic data ("single-step" methods). Currently, NNMM provides broad scope of analyses, e.g., a wide collection of Bayesian
-methods for whole-genome analyses, including shrinkage estimation and variable selection methods. The features of NNMM include:
+# NNMM.jl - Neural Network Mixed Models
 
-* Univariate (single-trait) analysis
-* Multivariate (multi-trait) analysis  
-* No limitations on fixed effects (e.g., herd, year, age, sex)
-* Random effects other than markers (e.g., litter, pen)                                  
-* Random effects using pedigree information
-  - Additive genetic effects
-  - Maternal effects
-* Random permanent environmental effects  
-* Correlated residuals		
-* Correlated random effects
-* Unknown (or known) variance components
-* Use of genomic information
-  - Complete genomic data                                      		
-  - Incomplete genomic data (singe-step)
+NNMM.jl is a Julia package for **Mixed Effect Neural Networks** that extend traditional linear mixed models to multilayer neural networks for genomic prediction and genome-wide association studies.
 
+## Key Features
+
+* **Neural Network Architecture**: Extend linear mixed models to multilayer neural networks
+* **Intermediate Omics Integration**: Incorporate known intermediate omics features (e.g., gene expression) in the middle layer
+* **Flexible Missing Data Handling**: Allow any patterns of missing data in intermediate layers
+* **Bayesian Framework**: Full Bayesian inference using MCMC and Hamiltonian Monte Carlo
+* **Multi-threaded Parallelism**: Efficient parallel computing for large-scale analyses
+
+## Network Architecture
+
+NNMM models relationships between:
+- **Input Layer**: Genotypes (SNP markers)
+- **Middle Layer**: Intermediate traits (e.g., gene expression, metabolomics)
+- **Output Layer**: Phenotypes
+
+The package supports:
+- Fully-connected neural networks
+- Partial-connected neural networks
+- User-defined nonlinear activation functions
+
+## Installation
+
+```julia
+using Pkg
+Pkg.add("NNMM")
+```
+
+Or for the latest development version:
+```julia
+Pkg.add(url="https://github.com/reworkhow/NNMM.jl")
+```
+
+## Quick Start
+
+```julia
+using NNMM, CSV, DataFrames
+
+# Load data
+phenotypes = CSV.read("phenotypes.csv", DataFrame)
+omics = CSV.read("omics.csv", DataFrame)
+genotypes = CSV.read("genotypes.csv", DataFrame)
+
+# Define network layers
+layer1 = Layer(data=genotypes)
+layer2 = Layer(data=omics, n_latent=size(omics, 2)-1)
+layer3 = Layer(data=phenotypes)
+
+# Build model equation
+eq = Equation(layer1, layer2, layer3, "y")
+
+# Run MCMC
+results = runNNMM(eq, chain_length=5000, output_folder="results")
+```
 
 ## Supporting and Citing
 
-We hope the friendly user interface and fast computing speed of NNMM will provide power and convenience for users in both industry
-and academia to analyze large datasets. Further, as a well-documented open-source software tool, we hope NNMM will also be used by a
-group of active community members, who will contribute to the source code and help maintain the project. Junior scientists can
-understand and learn the methodologies for whole-genome analyses by using NNMM and reading the tutorials and source code.
+If you use NNMM.jl for your research, please cite:
 
-If you would like to help support NNMM, please star the repository on the upper right corner
-[here](https://github.com/reworkhow/NNMM.jl) as such statistic will help to demonstrate the
-active involvement of the community. If you use NNMM for your research, teaching, or other activities,
-we would be grateful if you could cite our work following [Citing](@ref).
+> Zhao, T., Zeng, J., & Cheng, H. (2022). Extend mixed models to multilayer neural networks for genomic prediction including intermediate omics data. *GENETICS*. https://doi.org/10.1093/genetics/iyac034
 
+> Zhao, T., Fernando, R., & Cheng, H. (2021). Interpretable artificial neural networks incorporating Bayesian alphabet models for genome-wide prediction and association studies. *G3 Genes|Genomes|Genetics*. https://doi.org/10.1093/g3journal/jkab228
 
-## The trouble, the error and the new feature
+Please star the repository [here](https://github.com/reworkhow/NNMM.jl) to help demonstrate community involvement.
 
-If you have trouble using NNMM, want new features or find errors in NNMM, please post it in our [discussion group](https://groups.io/g/qtlrocks), [open an issue](https://github.com/reworkhow/NNMM.jl/issues), or contact <qtlcheng@ucdavis.edu>.
+## Getting Help
+
+- [Open an issue](https://github.com/reworkhow/NNMM.jl/issues) on GitHub
+- Contact: <qtlcheng@ucdavis.edu>
 
 ## Tutorials
 
-### Theory
+### NNMM Tutorials
 ```@contents
 Pages = [
-  "theory/theory.md"
+  "nnmm/Part1_introduction.md",
+  "nnmm/Part2_NNMM.md",
+  "nnmm/Part3_NNMMwithIntermediateOmics.md",
+  "nnmm/Part4_PartialConnectedNeuralNetwork.md",
+  "nnmm/Part5_UserDefinedNonlinearFunction.md",
 ]
-Depth = 3
+Depth = 2
 ```
 
 ### Manual
 ```@contents
 Pages = [
   "manual/getstarted.md",
-  "manual/workflow.md",
   "manual/public.md",
-  "manual/internals.md",
-]
-Depth = 3
-```
-
-### Examples
-```@contents
-Pages = [
-  "examples/examples.md"
 ]
 Depth = 2
 ```
