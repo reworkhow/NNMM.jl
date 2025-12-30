@@ -3,8 +3,6 @@
 [![CI](https://github.com/reworkhow/NNMM.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/reworkhow/NNMM.jl/actions/workflows/CI.yml)
 [![](https://img.shields.io/badge/docs-latest-blue.svg)](https://reworkhow.github.io/NNMM.jl/latest)
 
-![NNMM](docs/src/assets/NNMM.png)
-
 **NNMM.jl** is an open-source Julia package for **Neural Network Mixed Models** that extend traditional linear mixed models to multilayer neural networks for genomic prediction and genome-wide association studies.
 
 * **Documentation**: [https://reworkhow.github.io/NNMM.jl/latest](https://reworkhow.github.io/NNMM.jl/latest)
