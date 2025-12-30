@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Julia
+*.jl.cov
+*.jl.mem
+Manifest.toml
+
+# Build artifacts
+docs/build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Results folders
+results/
+
