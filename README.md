@@ -8,7 +8,7 @@
 **NNMM.jl** is an open-source Julia package for **Neural Network Mixed Models** that extend traditional linear mixed models to multilayer neural networks for genomic prediction and genome-wide association studies.
 
 * **Documentation**: [https://reworkhow.github.io/NNMM.jl/latest](https://reworkhow.github.io/NNMM.jl/latest)
-* **Authors**: [Hao Cheng](https://qtl.rocks), [Tianjing Zhao](https://animalscience.unl.edu/faculty-staff/tianjing-zhao), [Rohan Fernando](http://www.ans.iastate.edu/people/rohan-fernando), [Dorian Garrick](http://www.massey.ac.nz/massey/expertise/profile.cfm?stref=600130)
+* **Authors**: [Hao Cheng](https://qtl.rocks), [Tianjing Zhao](https://animalscience.unl.edu/person/tianjing-zhao/)
 
 ## Key Features
 
