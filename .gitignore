@@ -13,7 +13,18 @@ docs/build/
 .idea/
 .vscode/
 *.swp
+*.sublime-*
 
 # Results folders
 results/
+nnmm_results/
+mytest/
+
+# Test artifacts
+test/fixtures/*.csv
+IDs_for_individuals_with_pedigree.txt
+
+# Coverage
+lcov.info
+*.cov
 

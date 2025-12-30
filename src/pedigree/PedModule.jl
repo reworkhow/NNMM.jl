@@ -298,6 +298,6 @@ function get_info(pedigree::Pedigree;Ai=false)
     end
 end
 
-include("forSSBR.jl")
+include("ssbr.jl")
 
 end # of PedModule
