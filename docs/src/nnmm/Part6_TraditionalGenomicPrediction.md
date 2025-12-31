@@ -15,7 +15,7 @@ Traditional genomic prediction models like BayesC can be expressed as a special 
 
 ```
 ┌─────────────┐     ┌─────────────────┐     ┌─────────────┐
-│  Genotypes  │ ──► │  Latent Node    │ ──► │ Phenotype   │
+│  Genotypes  │ ──► │  Latent Nodes   │ ──► │ Phenotype   │
 │   (SNPs)    │     │ (100% missing)  │     │    (y)      │
 └─────────────┘     └─────────────────┘     └─────────────┘
                     Sampled via BayesC       Linear activation
@@ -32,10 +32,12 @@ where $\alpha$ are marker effects sampled using BayesC.
 ```julia
 using NNMM, DataFrames, CSV
 
-# Step 1: Create a middle layer with ONE completely missing node
+# Step 1: Create a middle layer with completely missing latent nodes
+# Note: Use at least 2 latent nodes for matrix operations in HMC
 omics_df = DataFrame(
     ID = individual_ids,
-    latent = fill(missing, n_individuals)  # All NA
+    latent1 = fill(missing, n_individuals),  # All NA
+    latent2 = fill(missing, n_individuals)   # All NA
 )
 CSV.write("latent.csv", omics_df; missingstring="NA")
 
@@ -53,7 +55,7 @@ equations = [
         from_layer_name="geno",
         to_layer_name="latent",
         equation="latent = intercept + geno",
-        omics_name=["latent"],
+        omics_name=["latent1", "latent2"],
         method="BayesC",
         estimatePi=true
     ),
@@ -72,52 +74,11 @@ equations = [
 result = runNNMM(layers, equations; chain_length=50000, burnin=10000)
 ```
 
-## Example: Multi-Trait BayesC
+## Note on Multi-Trait Analysis
 
-For multi-trait analysis, simply use multiple missing nodes:
-
-```julia
-# Middle layer with TWO completely missing nodes
-omics_df = DataFrame(
-    ID = individual_ids,
-    latent1 = fill(missing, n_individuals),
-    latent2 = fill(missing, n_individuals)
-)
-CSV.write("latent_multi.csv", omics_df; missingstring="NA")
-
-# Phenotype data with two traits
-pheno_df = DataFrame(
-    ID = individual_ids,
-    y1 = trait1_values,
-    y2 = trait2_values
-)
-
-layers = [
-    Layer(layer_name="geno", data_path=["genotypes.csv"]),
-    Layer(layer_name="latent", data_path="latent_multi.csv", missing_value="NA"),
-    Layer(layer_name="phenotypes", data_path="phenotypes_multi.csv", missing_value="NA")
-]
-
-equations = [
-    Equation(
-        from_layer_name="geno",
-        to_layer_name="latent",
-        equation="latent = intercept + geno",
-        omics_name=["latent1", "latent2"],
-        method="BayesC"
-    ),
-    Equation(
-        from_layer_name="latent",
-        to_layer_name="phenotypes",
-        equation="phenotypes = intercept + latent",
-        phenotype_name=["y1", "y2"],
-        method="BayesC",
-        activation_function="linear"
-    )
-]
-
-result = runNNMM(layers, equations; chain_length=50000)
-```
+!!! note "Current Limitation"
+    Multiple phenotypes in the output layer are not yet supported in the current NNMM implementation.
+    Multi-trait genomic prediction will be supported in a future release.
 
 ## Comparison with Direct BayesC
 
