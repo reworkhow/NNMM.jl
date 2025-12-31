@@ -25,4 +25,7 @@ using NNMM
     
     # NNMM Bayesian method tests
     include("test_nnmm_methods.jl")
+    
+    # NNMM as traditional BayesC (missing middle layer pattern)
+    include("test_nnmm_as_bayesc.jl")
 end

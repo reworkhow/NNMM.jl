@@ -7,6 +7,7 @@ NNMM.jl is a Julia package for **Mixed Effect Neural Networks** that extend trad
 
 ## Key Features
 
+* **Generalizes Traditional Methods**: Traditional BayesC and other Bayesian alphabet methods are special cases of NNMM
 * **Neural Network Architecture**: Extend linear mixed models to multilayer neural networks
 * **Intermediate Omics Integration**: Incorporate known intermediate omics features (e.g., gene expression) in the middle layer
 * **Flexible Missing Data Handling**: Allow any patterns of missing data in intermediate layers
@@ -84,6 +85,7 @@ Pages = [
   "nnmm/Part3_NNMMwithIntermediateOmics.md",
   "nnmm/Part4_PartialConnectedNeuralNetwork.md",
   "nnmm/Part5_UserDefinedNonlinearFunction.md",
+  "nnmm/Part6_TraditionalGenomicPrediction.md",
 ]
 Depth = 2
 ```

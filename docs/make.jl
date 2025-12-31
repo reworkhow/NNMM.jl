@@ -14,6 +14,7 @@ makedocs(
             "Part 3. NNMM with intermediate omics" => "nnmm/Part3_NNMMwithIntermediateOmics.md",
             "Part 4. Partial connected neural network" => "nnmm/Part4_PartialConnectedNeuralNetwork.md",
             "Part 5. User-defined nonlinear function" => "nnmm/Part5_UserDefinedNonlinearFunction.md",
+            "Part 6. Traditional genomic prediction" => "nnmm/Part6_TraditionalGenomicPrediction.md",
         ],
         "Manual" => Any[
             "Get Started" => "manual/getstarted.md",
