@@ -6,31 +6,26 @@ using CSV
 using Random
 
 @testset "NNMM Activation Functions" begin
+    # Use simulated omics dataset
+    geno_path = Datasets.dataset("genotypes_1000snps.txt", dataset_name="simulated_omics_data")
+    pheno_path = Datasets.dataset("phenotypes_sim.txt", dataset_name="simulated_omics_data")
+    
     # Setup test data directory
     data_dir = joinpath(@__DIR__, "fixtures", "activation")
     mkpath(data_dir)
     
-    # Prepare test data once for all activation function tests
-    geno_path = dataset("genotypes0.csv")
-    Random.seed!(456)
-    geno = NNMM.nnmm_get_genotypes(geno_path)
-    nind = length(geno.obsID)
+    # Load phenotype data and create test files
+    pheno_df = CSV.read(pheno_path, DataFrame)
     
-    # Create synthetic omics data
-    omics_df = DataFrame(ID=geno.obsID)
-    for i in 1:3
-        omics_df[!, Symbol("o$(i)")] = randn(nind)
-    end
+    # Create omics file (use 3 omics for faster tests)
+    omics_df = pheno_df[:, [:ID, :omic1, :omic2, :omic3]]
     o_path = joinpath(data_dir, "omics.csv")
     CSV.write(o_path, omics_df; missingstring="NA")
     
-    # Create phenotype data
-    pheno_df = DataFrame(
-        ID=geno.obsID,
-        y1=randn(nind)
-    )
+    # Create phenotype file
+    pheno_out_df = pheno_df[:, [:ID, :trait1]]
     y_path = joinpath(data_dir, "phenotypes.csv")
-    CSV.write(y_path, pheno_df; missingstring="NA")
+    CSV.write(y_path, pheno_out_df; missingstring="NA")
     
     # Test each activation function
     for activation in ["linear", "sigmoid"]
@@ -46,14 +41,14 @@ using Random
                     from_layer_name="geno",
                     to_layer_name="omics",
                     equation="omics = intercept + geno",
-                    omics_name=["o1", "o2", "o3"],
+                    omics_name=["omic1", "omic2", "omic3"],
                     method="BayesC"
                 ),
                 Equation(
                     from_layer_name="omics",
                     to_layer_name="phenotypes",
                     equation="phenotypes = intercept + omics",
-                    phenotype_name=["y1"],
+                    phenotype_name=["trait1"],
                     method="BayesC",
                     activation_function=activation
                 )
@@ -67,17 +62,14 @@ using Random
             
             # Verify results
             @test result !== nothing
-            @test haskey(result, "EBV_y1")
+            @test haskey(result, "EBV_NonLinear")
             
-            ebv_df = result["EBV_y1"]
-            @test nrow(ebv_df) > 0
+            ebv_df = result["EBV_NonLinear"]
+            @test nrow(ebv_df) > 3000
             @test all(!isnan, ebv_df.EBV)
         end
     end
     
     # Cleanup
-    if isdir(data_dir)
-        rm(data_dir, recursive=true)
-    end
+    rm(data_dir, recursive=true, force=true)
 end
-

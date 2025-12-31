@@ -8,9 +8,10 @@ export get_pedigree
 export get_info
 
 """
-    get_pedigree(pedfile::AbstractString;header=false,separator=',',missingstrings=["0"])
+    get_pedigree(pedfile::AbstractString;header=false,separator=',',missingstrings=["0"],output_folder=".")
 * Get pedigree informtion from a pedigree file with **header** (defaulting to `false`)
   , **separator** (defaulting to `,`) and missing values (defaulting to ["0"])
+* `output_folder`: Directory to save diagnostic files (defaulting to current directory)
 * Pedigree file format:
 
 ```
@@ -19,7 +20,7 @@ c,a,b
 d,a,c
 ```
 """
-function get_pedigree(pedfile::Union{AbstractString,DataFrames.DataFrame};header=false,separator=',',missingstrings=["0"])
+function get_pedigree(pedfile::Union{AbstractString,DataFrames.DataFrame};header=false,separator=',',missingstrings=["0"],output_folder=".")
     if typeof(pedfile) <: AbstractString
         printstyled("The delimiter in ",split(pedfile,['/','\\'])[end]," is \'",separator,"\'.\n",bold=false,color=:green)
         df  = CSV.read(pedfile,DataFrame,types=[String,String,String],
@@ -46,7 +47,10 @@ function get_pedigree(pedfile::Union{AbstractString,DataFrames.DataFrame};header
     ped.IDs=getIDs(ped)
 
     get_info(ped)
-    writedlm("IDs_for_individuals_with_pedigree.txt",ped.IDs)
+    # Save IDs file to output folder
+    if ispath(output_folder)
+        writedlm(joinpath(output_folder, "IDs_for_individuals_with_pedigree.txt"), ped.IDs)
+    end
 
     return ped
 end

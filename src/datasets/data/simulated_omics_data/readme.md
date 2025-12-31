@@ -1,0 +1,5 @@
+# Simulated Data README
+
+## Simulation workflow (omics + genetics)
+
+This simulation samples 1,000 evenly spaced integer-only SNPs and builds phenotypes through direct SNP effects, a 10-omics layer, and environmental effects. The SNPs are partitioned into 10 consecutive blocks (1-100, 101-200, ..., 901-1000) so each block drives one omic; each omic's genetic component is simulated from its SNP block with heritability 0.3 and combined with omic-specific residual noise to form omic values. Omics then influence the final trait via random effect sizes, while SNPs also contribute directly to the trait. The direct and indirect (omics-mediated) genetic components are orthogonalized and scaled so that total genetic variance equals the target heritability and is split exactly 20% direct / 80% indirect. Phenotypes are the sum of group effect, litter effect, direct SNP genetic value, omics contribution, and residual noise, with outputs including phenotypes_sim.txt (omic and genetic columns), effects_sim.txt (group/litter/SNP/omic effects), and summary_stats.csv (component variances, including per-omic indirect genetic variance).

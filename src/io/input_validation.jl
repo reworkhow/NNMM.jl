@@ -370,9 +370,12 @@ function make_dataframes(df,mme)
     #***************************************************************************
     # Return
     #***************************************************************************
+    # Save IDs to output folder if available, otherwise current directory
+    output_folder = (mme.MCMCinfo !== nothing && mme.MCMCinfo.output_folder !== nothing) ? mme.MCMCinfo.output_folder : "."
+    ids_file = joinpath(output_folder, "IDs_for_individuals_with_phenotypes.txt")
     printstyled("Phenotypes for ",length(train_index)," observations are used in the analysis.",
-    "These individual IDs are saved in the file IDs_for_individuals_with_phenotypes.txt.\n",bold=false,color=:green)
-    writedlm("IDs_for_individuals_with_phenotypes.txt",unique(df_whole[train_index,1]))
+    "These individual IDs are saved in the file $ids_file.\n",bold=false,color=:green)
+    writedlm(ids_file, unique(df_whole[train_index,1]))
     mme.obsID = map(string,df_whole[train_index,1])
     return df_whole,train_index
 end

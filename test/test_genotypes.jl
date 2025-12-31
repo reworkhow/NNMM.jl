@@ -1,34 +1,41 @@
-using CSV,DataFrames,NNMM,NNMM.Datasets,DelimitedFiles,CSV
+using Test
+using NNMM
+using NNMM.Datasets
+using CSV
+using DataFrames
 
-
-genofile   = Datasets.dataset("genotypes.txt",dataset_name="example")
-genofile_noheader    = Datasets.dataset("genotypes_noheader.txt",dataset_name="example")
-geno                      = readdlm(genofile,',')
-geno_array,markerIDs,obsID = map(Float64,geno[2:end,2:end]),geno[1,:],geno[2:end,1]
-geno_dataframe            = CSV.read(genofile,DataFrame)[:,2:end]
-
-println("load genotype ...")
-
-println("\nfrom a text file with a header (marker IDs)")
-model1 = build_model("y = intercept",1.0);
-add_genotypes(model1,genofile,1.0,separator=',',header=true,center=true)
-
-println("\nfrom a text file without a header (no marker IDs)")
-model2 = build_model("y = intercept",1.0);
-add_genotypes(model2,genofile_noheader,1.0,separator=',',header=false,center=true)
-
-println("\nfrom an Array (matrix) with marker IDs and individual IDs provided")
-model3 = build_model("y = intercept",1.0);
-add_genotypes(model3,geno_array,1.0,header=markerIDs,rowID=obsID,center=true)
-
-println("\nfrom an Array (matrix) without marker IDs and with individual IDs provided")
-model4 = build_model("y = intercept",1.0);
-add_genotypes(model4,geno_array,1.0,rowID=obsID,center=true)
-
-println("\nfrom an Array (matrix) without marker IDs and individual IDs")
-model5 = build_model("y = intercept",1.0);
-add_genotypes(model5,geno_array,1.0,center=true)
-
-println("\nfrom a DataFrame with marker IDs and individual IDs provided")
-model6 = build_model("y = intercept",1.0);
-add_genotypes(model6,geno_dataframe,1.0,header=markerIDs,rowID=obsID,center=true)
+@testset "Genotype Loading" begin
+    # Use simulated dataset genotypes
+    genofile = Datasets.dataset("genotypes_1000snps.txt", dataset_name="simulated_omics_data")
+    
+    @testset "nnmm_get_genotypes function" begin
+        geno = NNMM.nnmm_get_genotypes(genofile)
+        
+        @test typeof(geno) == NNMM.Genotypes
+        @test length(geno.obsID) > 3000
+        @test geno.nMarkers > 900  # After MAF filtering (~927 expected)
+        @test geno.nObs > 3000     # Should have 3534 individuals
+        @test size(geno.genotypes, 1) == geno.nObs
+        @test size(geno.genotypes, 2) == geno.nMarkers
+        
+        # Verify genotype values are in expected range [0,2] after centering
+        # Note: after centering, values should be approximately centered around 0
+        @test all(x -> !isnan(x), geno.genotypes)
+    end
+    
+    @testset "Genotype data integrity" begin
+        # Load raw genotypes to check structure
+        geno_df = CSV.read(genofile, DataFrame)
+        
+        # Check dimensions
+        @test nrow(geno_df) == 3534  # Number of individuals
+        @test ncol(geno_df) == 1001  # ID + 1000 SNPs
+        
+        # Check that first column is ID
+        @test propertynames(geno_df)[1] == :ID
+        
+        # Check that genotype values are 0, 1, or 2
+        geno_matrix = Matrix(geno_df[:, 2:end])
+        @test all(x -> x in [0, 1, 2], geno_matrix)
+    end
+end

@@ -5,7 +5,8 @@ using DataFrames
 using CSV
 
 @testset "Pedigree Module" begin
-    pedfile = Datasets.dataset("pedigree.txt", dataset_name="example")
+    # Use simulated dataset pedigree
+    pedfile = Datasets.dataset("pedigree.txt", dataset_name="simulated_omics_data")
     
     @testset "get_pedigree basic functionality" begin
         pedigree = get_pedigree(pedfile, separator=",", header=true)
@@ -18,6 +19,9 @@ using CSV
         
         # Test that idMap is populated
         @test length(pedigree.idMap) > 0
+        
+        # Simulated pedigree has 6473 animals
+        @test length(pedigree.IDs) >= 3000
     end
     
     @testset "get_pedigree from DataFrame" begin
@@ -34,4 +38,3 @@ using CSV
         @test_nowarn NNMM.PedModule.get_info(pedigree)
     end
 end
-

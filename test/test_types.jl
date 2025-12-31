@@ -73,7 +73,7 @@ end
     # Test single-trait model building
     model_eq = "y1 = intercept + age + sex"
     R = 1.0
-    model = build_model(model_eq, R)
+    model = NNMM.build_model(model_eq, R)
     @test model.nModels == 1
     @test :y1 in model.lhsVec
 
@@ -81,7 +81,7 @@ end
     model_eq_mt = "y1 = intercept + age
                    y2 = intercept + age"
     R_mt = [1.0 0.5; 0.5 1.0]
-    model_mt = build_model(model_eq_mt, R_mt)
+    model_mt = NNMM.build_model(model_eq_mt, R_mt)
     @test model_mt.nModels == 2
     @test :y1 in model_mt.lhsVec
     @test :y2 in model_mt.lhsVec

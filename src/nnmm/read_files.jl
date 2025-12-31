@@ -10,7 +10,9 @@ function nnmm_get_genotypes(file::Union{AbstractString,Array{Float64,2},Array{Fl
                        ## quality control:
                        quality_control = true, MAF = 0.01, missing_value = 9.0,
                        ## others:
-                       center = true, starting_value = false)
+                       center = true, starting_value = false,
+                       ## output:
+                       output_folder = ".")
     #Define data precision
     data_type = double_precision ? Float64 : Float32 #works for both genotypes and GRM
     #Read the genotype file
@@ -140,7 +142,7 @@ function nnmm_get_genotypes(file::Union{AbstractString,Array{Float64,2},Array{Fl
     genotypes.estimatePi = estimatePi
     genotypes.π          = Pi
 
-    writedlm("IDs_for_individuals_with_genotypes.txt",genotypes.obsID)
+    writedlm(joinpath(output_folder, "IDs_for_individuals_with_genotypes.txt"), genotypes.obsID)
     println("Genotype informatin:")
     println("#markers: ",(isGRM ? 0 : size(genotypes.genotypes,2)),"; #individuals: ",size(genotypes.genotypes,1))
 
@@ -174,7 +176,9 @@ function nnmm_get_omics(file::AbstractString, G = false;
                        # format:
                        separator = ',', header = true, 
                        ## quality control:
-                       missing_value = false)
+                       missing_value = false,
+                       ## output:
+                       output_folder = ".")
 
     #Read the genotype file
     if typeof(file) <: AbstractString  #string (path to a file)
@@ -211,7 +215,7 @@ function nnmm_get_omics(file::AbstractString, G = false;
     omics.estimatePi = estimatePi
     omics.π          = Pi
 
-    writedlm("IDs_for_individuals_with_genotypes.txt",obsID)
+    writedlm(joinpath(output_folder, "IDs_for_individuals_with_omics.txt"), obsID)
     println("Omics informatin:")
     println("#omics: ",nOmics,"; #individuals: ",nObs)
     println("omics name: ",omics_name)
@@ -240,7 +244,9 @@ end
 
 function read_phenotypes(file::AbstractString;
                        ## format:
-                       separator = ',', header = true, missing_value = "NA")
+                       separator = ',', header = true, missing_value = "NA",
+                       ## output:
+                       output_folder = ".")
     #print info about the file format
     printstyled("The delimiter in ", split(file, ['/', '\\'])[end], " is \'", separator, "\'. ", bold=false, color=:green)
     printstyled("The header (pheno IDs) is ", (header ? "provided" : "not provided"), " in ", split(file, ['/', '\\'])[end], ".\n", bold=false, color=:green)
@@ -255,7 +261,7 @@ function read_phenotypes(file::AbstractString;
     nObs = size(data,1)       #number of individuals 
     nPheno = size(data,2)-1  #the 1st column is obsID
 
-    writedlm("IDs_for_individuals_with_phenotypes.txt",obsID)
+    writedlm(joinpath(output_folder, "IDs_for_individuals_with_phenotypes.txt"), obsID)
     println("Phenotypes data information:")
     println("#pheno: ", nPheno,"; #individuals: ", nObs)
 

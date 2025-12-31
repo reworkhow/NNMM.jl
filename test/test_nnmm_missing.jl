@@ -6,38 +6,41 @@ using CSV
 using Random
 
 @testset "NNMM Missing Data Handling" begin
+    # Use simulated omics dataset
+    geno_path = Datasets.dataset("genotypes_1000snps.txt", dataset_name="simulated_omics_data")
+    pheno_path = Datasets.dataset("phenotypes_sim.txt", dataset_name="simulated_omics_data")
+    
     # Setup test data directory
     data_dir = joinpath(@__DIR__, "fixtures", "missing")
     mkpath(data_dir)
     
-    # Get genotype data
-    geno_path = dataset("genotypes0.csv")
-    Random.seed!(789)
-    geno = NNMM.nnmm_get_genotypes(geno_path)
-    nind = length(geno.obsID)
+    # Load phenotype data
+    pheno_df = CSV.read(pheno_path, DataFrame)
+    nind = nrow(pheno_df)
     
     @testset "Missing values in omics layer" begin
         # Create omics data with missing values
-        omics_df = DataFrame(ID=geno.obsID)
-        for i in 1:3
-            col_data = randn(nind)
-            # Introduce missing values (10% missing)
-            missing_idx = rand(1:nind, max(1, nind ÷ 10))
-            col_data_union = Vector{Union{Float64, Missing}}(col_data)
-            col_data_union[missing_idx] .= missing
-            omics_df[!, Symbol("o$(i)")] = col_data_union
+        omics_df = pheno_df[:, [:ID, :omic1, :omic2, :omic3]]
+        
+        # Introduce missing values (10% missing in each column)
+        Random.seed!(123)
+        for col in [:omic1, :omic2, :omic3]
+            omics_df[!, col] = Vector{Union{Float64, Missing}}(omics_df[!, col])
+            missing_idx = rand(1:nind, nind ÷ 10)
+            omics_df[missing_idx, col] .= missing
         end
+        
         o_path = joinpath(data_dir, "omics_missing.csv")
         CSV.write(o_path, omics_df; missingstring="NA")
-        @test isfile(o_path)
         
-        # Create phenotype data (complete)
-        pheno_df = DataFrame(
-            ID=geno.obsID,
-            y1=randn(nind)
-        )
+        # Verify missing values were introduced
+        omics_check = CSV.read(o_path, DataFrame; missingstring="NA")
+        @test sum(ismissing.(omics_check.omic1)) > 0
+        
+        # Create complete phenotype data
+        pheno_out_df = pheno_df[:, [:ID, :trait1]]
         y_path = joinpath(data_dir, "phenotypes_complete.csv")
-        CSV.write(y_path, pheno_df; missingstring="NA")
+        CSV.write(y_path, pheno_out_df; missingstring="NA")
         
         # Define layers
         layers = [
@@ -51,49 +54,46 @@ using Random
                 from_layer_name="geno",
                 to_layer_name="omics",
                 equation="omics = intercept + geno",
-                omics_name=["o1", "o2", "o3"],
+                omics_name=["omic1", "omic2", "omic3"],
                 method="BayesC"
             ),
             Equation(
                 from_layer_name="omics",
                 to_layer_name="phenotypes",
                 equation="phenotypes = intercept + omics",
-                phenotype_name=["y1"],
+                phenotype_name=["trait1"],
                 method="BayesC"
             )
         ]
         
-        # Run NNMM - should handle missing omics values
+        # Run NNMM - should handle missing omics values via HMC sampling
         result = runNNMM(layers, equations; chain_length=5, printout_frequency=100)
         
         @test result !== nothing
-        @test haskey(result, "EBV_y1")
-        @test nrow(result["EBV_y1"]) > 0
+        @test haskey(result, "EBV_NonLinear")
+        @test nrow(result["EBV_NonLinear"]) > 3000
     end
     
     @testset "Missing values in phenotype layer" begin
         # Create complete omics data
-        omics_df = DataFrame(ID=geno.obsID)
-        for i in 1:3
-            omics_df[!, Symbol("o$(i)")] = randn(nind)
-        end
+        omics_df = pheno_df[:, [:ID, :omic1, :omic2, :omic3]]
         o_path = joinpath(data_dir, "omics_complete.csv")
         CSV.write(o_path, omics_df; missingstring="NA")
         
         # Create phenotype data with missing values
-        y1_data = randn(nind)
-        y1_data_union = Vector{Union{Float64, Missing}}(y1_data)
-        # Make 5% of phenotypes missing
-        missing_idx = rand(1:nind, max(1, nind ÷ 20))
-        y1_data_union[missing_idx] .= missing
+        pheno_out_df = pheno_df[:, [:ID, :trait1]]
+        pheno_out_df[!, :trait1] = Vector{Union{Float64, Missing}}(pheno_out_df[!, :trait1])
         
-        pheno_df = DataFrame(
-            ID=geno.obsID,
-            y1=y1_data_union
-        )
+        # Make 5% of phenotypes missing
+        Random.seed!(456)
+        missing_idx = rand(1:nind, nind ÷ 20)
+        pheno_out_df[missing_idx, :trait1] .= missing
+        
         y_path = joinpath(data_dir, "phenotypes_missing.csv")
-        CSV.write(y_path, pheno_df; missingstring="NA")
-        @test isfile(y_path)
+        CSV.write(y_path, pheno_out_df; missingstring="NA")
+        
+        # Verify missing values
+        @test sum(ismissing.(pheno_out_df.trait1)) > 0
         
         # Define layers
         layers = [
@@ -107,14 +107,14 @@ using Random
                 from_layer_name="geno",
                 to_layer_name="omics",
                 equation="omics = intercept + geno",
-                omics_name=["o1", "o2", "o3"],
+                omics_name=["omic1", "omic2", "omic3"],
                 method="BayesC"
             ),
             Equation(
                 from_layer_name="omics",
                 to_layer_name="phenotypes",
                 equation="phenotypes = intercept + omics",
-                phenotype_name=["y1"],
+                phenotype_name=["trait1"],
                 method="BayesC"
             )
         ]
@@ -123,14 +123,11 @@ using Random
         result = runNNMM(layers, equations; chain_length=5, printout_frequency=100)
         
         @test result !== nothing
-        @test haskey(result, "EBV_y1")
+        @test haskey(result, "EBV_NonLinear")
         # EBV should be available for all individuals, including those with missing phenotypes
-        @test nrow(result["EBV_y1"]) > 0
+        @test nrow(result["EBV_NonLinear"]) > 3000
     end
     
     # Cleanup
-    if isdir(data_dir)
-        rm(data_dir, recursive=true)
-    end
+    rm(data_dir, recursive=true, force=true)
 end
-

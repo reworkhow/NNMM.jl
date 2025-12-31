@@ -19,6 +19,18 @@ function runNNMM(layers, equations;
                 output_samples_for_all_parameters = false)
 
     ############################################################################
+    # Create output folder at the start (so all diagnostic files go here)
+    ############################################################################
+    myfolder,folderi = output_folder, 1
+    while ispath(output_folder)
+        printstyled("The folder $output_folder already exists.\n",bold=false,color=:red)
+        output_folder = myfolder*string(folderi)
+        folderi += 1
+    end
+    mkdir(output_folder)
+    printstyled("The folder $output_folder is created to save results.\n",bold=false,color=:green)
+
+    ############################################################################
     # Step1. read genotypes in layer 1
     #  note: need to read genotypes here because "method" is defined in equations
     ############################################################################
@@ -88,7 +100,9 @@ function runNNMM(layers, equations;
                             ## quality control:
                             quality_control = quality_control, MAF = MAF, missing_value = missing_value,
                             ## others:
-                            center = center, starting_value = starting_value)
+                            center = center, starting_value = starting_value,
+                            ## output:
+                            output_folder = output_folder)
         
         push!(layers[1].data, geno)
 
@@ -170,7 +184,9 @@ function runNNMM(layers, equations;
                     ## format:
                     separator = separator, header = true,
                     ## quality control:
-                    missing_value = missing_value)
+                    missing_value = missing_value,
+                    ## output:
+                    output_folder = output_folder)
     #reset some parameters for omics
     # omics.alleleFreq = false
     # omics.sum2pq     = false
@@ -217,7 +233,8 @@ function runNNMM(layers, equations;
     pheno = read_phenotypes(file_path;
                             separator=separator,
                             header=header,
-                            missing_value=missing_value)
+                            missing_value=missing_value,
+                            output_folder=output_folder)
     phenoID = equations[2].phenotype_name
     println("phenotype name: ",phenoID)
     if length(phenoID) > 1
@@ -730,18 +747,8 @@ function runNNMM(layers, equations;
         end
     end
     ############################################################################
-    # Create an folder to save outputs
-    ############################################################################
-    myfolder,folderi = output_folder, 1
-    while ispath(output_folder)
-        printstyled("The folder $output_folder already exists.\n",bold=false,color=:red)
-        output_folder = myfolder*string(folderi)
-        folderi += 1
-    end
-    mkdir(output_folder)
-    printstyled("The folder $output_folder is created to save results.\n",bold=false,color=:green)
-    ############################################################################
     # Save MCMC argumenets in MCMCinfo
+    # (output_folder was created at the start of runNNMM)
     ############################################################################
     heterogeneous_residuals=false
     single_step_analysis=false
