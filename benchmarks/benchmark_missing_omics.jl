@@ -30,8 +30,8 @@ println()
 
 # Configuration
 const SEED = 42
-const CHAIN_LENGTH = 500
-const BURNIN = 100
+const CHAIN_LENGTH = 1000
+const BURNIN = 200
 const MISSING_PERCENTAGES = [0.0, 0.3, 0.5]  # 0%, 30%, 50% missing
 
 # Load simulated dataset

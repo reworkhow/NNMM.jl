@@ -29,8 +29,8 @@ println()
 
 # Configuration - these parameters work reliably with seed=42
 const SEED = 42
-const CHAIN_LENGTH = 100
-const BURNIN = 20
+const CHAIN_LENGTH = 1000
+const BURNIN = 200
 
 Random.seed!(SEED)
 

@@ -1,66 +1,81 @@
-# NNMM Benchmark Results for PyNNMM Parity
-
-This document contains benchmark results from NNMM.jl that should be used as target values for validating the PyNNMM implementation.
+# NNMM.jl Benchmark Results
 
 ## Dataset: simulated_omics_data
 
-| Property | Value |
-|----------|-------|
-| Individuals | 3,534 |
-| SNPs | 1,000 (927 after MAF filtering) |
-| Omics | 10 |
-| Target heritability | 0.5 (20% direct, 80% indirect) |
+- **Individuals**: 3534
+- **SNPs**: 1000 (927 after MAF filtering)
+- **Omics**: 10
+- **Target heritability**: 0.5 (20% direct, 80% indirect)
 
-### Ground Truth
+## Configuration
 
-The dataset includes true breeding values:
-- `genetic_total` = Total genetic value (direct + indirect)
-- `genetic_direct` = Direct SNP effects (20% of genetic variance)
-- `genetic_indirect` = Omics-mediated effects (80% of genetic variance)
+- **Seed**: 42
+- **Chain length**: 1000
+- **Burnin**: 200
+- **Method**: BayesC (both layers)
+- **Activation**: linear
 
-## Benchmark Configuration
+---
 
-| Parameter | Value |
-|-----------|-------|
-| Seed | 42 |
-| Chain length | 100 |
-| Burnin | 20 |
-| Method | BayesC (both layers) |
-| Activation | linear |
+## Full Omics Benchmark (`benchmark_accuracy.jl`)
 
-## Target Accuracy Values for PyNNMM
-
-These are the accuracy metrics that PyNNMM should achieve (within ±0.05):
+### Accuracy Metrics
 
 | Metric | Value |
 |--------|-------|
-| **cor(EBV, genetic_total)** | **0.7899** |
-| cor(EBV, genetic_direct) | 0.0372 |
-| **cor(EBV, genetic_indirect)** | **0.8645** |
+| cor(EBV, genetic_total) | **0.8549** |
+| cor(EBV, genetic_direct) | 0.0399 |
+| cor(EBV, genetic_indirect) | 0.9358 |
 
 ### EBV Statistics
 
 | Statistic | Value |
 |-----------|-------|
-| Mean | ~0.0 |
-| Std | ~32.08 |
+| Mean | -0.0 |
+| Std | 358.712 |
 
-## Interpretation
+---
 
-1. **High accuracy for indirect effects (0.86)**: NNMM captures omics-mediated genetic effects well
-2. **High accuracy for total effects (0.79)**: Good overall genomic prediction
-3. **Low accuracy for direct effects (0.04)**: Expected since only 20% of genetic variance is direct
+## Missing Omics Benchmark (`benchmark_missing_omics.jl`)
 
-## Running the Benchmark
+### Accuracy by Missing Percentage
+
+| Missing % | Missing Cells | cor(EBV, total) | cor(EBV, direct) | cor(EBV, indirect) |
+|-----------|---------------|-----------------|------------------|---------------------|
+| 0% | 0 | **0.8549** | 0.0399 | 0.9358 |
+| 30% | 10,600 | **0.7873** | 0.0685 | 0.8460 |
+| 50% | 17,670 | **0.7365** | 0.1497 | 0.7486 |
+
+### Accuracy Degradation from Baseline
+
+| Missing % | Reduction |
+|-----------|-----------|
+| 30% | 7.9% |
+| 50% | 13.8% |
+
+---
+
+## PyNNMM Target Values
+
+PyNNMM should achieve similar accuracy metrics:
+- Full omics: cor(EBV, genetic_total) ≈ 0.85
+- 30% missing: cor(EBV, genetic_total) ≈ 0.79
+- 50% missing: cor(EBV, genetic_total) ≈ 0.74
+
+**Tolerance**: Results within ±0.05 are considered acceptable.
+
+---
+
+## Running Benchmarks
 
 ```bash
-cd NNMM.jl
+# Full omics benchmark
 julia --project=. benchmarks/benchmark_accuracy.jl
+
+# Missing omics benchmark
+julia --project=. benchmarks/benchmark_missing_omics.jl
 ```
 
-## Notes
+---
 
-- PyNNMM results should match within ±0.05 for the same seed and configuration
-- The simulated data is deterministic (from `simulate_from_genotypes.py` with seed=42)
-- MCMC sampling introduces stochastic variation, so exact matches are not expected
-
+*Generated: 2025-12-30*
