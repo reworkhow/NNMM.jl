@@ -261,9 +261,29 @@ function set_marker_hyperparameters_variances_and_pi(mme::MME)
                 end
             end
             #(3) scale parameter for marker effect variance
+            # The scale formula depends on the sampling distribution:
+            # - Single-trait or diagonal-only (constraint=true): Scaled Inverse Chi-square
+            #   E[Scale-Inv-χ²(ν, s²)] = νs²/(ν-2), so scale = prior_mean * (df-2) / df
+            # - Full covariance (constraint=false): Inverse Wishart  
+            #   E[IW(ν, S)] = S/(ν-p-1), so scale = prior_mean * (df-ntraits-1)
             if Mi.ntraits == 1 && mme.MCMCinfo.RRM == false
+                # Single trait: Scale-Inv-χ² with df > 2
+                if Mi.G.df <= 2
+                    @warn "Degrees of freedom ($(Mi.G.df)) should be > 2 for valid Scale-Inv-χ² prior"
+                end
                 Mi.G.scale = Mi.G.val*(Mi.G.df-Mi.ntraits-1)/Mi.G.df
+            elseif Mi.G.constraint == true
+                # Multi-trait with diagonal-only (independent variances): Scale-Inv-χ² for each
+                # Each diagonal element is sampled independently, so use single-trait formula
+                if Mi.G.df <= 2
+                    @warn "Degrees of freedom ($(Mi.G.df)) should be > 2 for valid Scale-Inv-χ² prior"
+                end
+                Mi.G.scale = Mi.G.val*(Mi.G.df-2)/Mi.G.df
             else
+                # Multi-trait with full covariance: Inverse Wishart
+                if Mi.G.df <= Mi.ntraits + 1
+                    @warn "Degrees of freedom ($(Mi.G.df)) should be > ntraits+1 ($(Mi.ntraits+1)) for valid Inverse-Wishart prior"
+                end
                 Mi.G.scale = Mi.G.val*(Mi.G.df-Mi.ntraits-1)
             end
         end

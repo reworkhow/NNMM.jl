@@ -92,7 +92,9 @@ function sample_variance(ycorr_array, nobs, df, scale, invweights, constraint; b
     else  #diagonal elements only, from scale-inv-⁠χ2
         R  = Diagonal(zeros(ntraits))
         for traiti = 1:ntraits
-            R[traiti,traiti]= (SSE[traiti,traiti]+df*scale[traiti,traiti])/rand(Chisq(nobs+df)) 
+            sampled_var = (SSE[traiti,traiti]+df*scale[traiti,traiti])/rand(Chisq(nobs+df))
+            # Safeguard: ensure variance is always positive (numerical stability)
+            R[traiti,traiti] = max(sampled_var, eps(Float64))
         end
     end
     return R
