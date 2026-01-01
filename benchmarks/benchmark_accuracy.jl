@@ -99,13 +99,24 @@ ebv_df = result["EBV_NonLinear"]
 ebv_df.ID = string.(ebv_df.ID)
 pheno_df.ID = string.(pheno_df.ID)
 
-# Merge with true breeding values
-merged_df = innerjoin(ebv_df, pheno_df[:, [:ID, :genetic_total, :genetic_direct, :genetic_indirect]], on=:ID)
+# Get EPV results
+epv_df = result["EPV_NonLinear"]
+epv_df.ID = string.(epv_df.ID)
 
-# Calculate accuracy metrics
-accuracy_total = cor(merged_df.EBV, merged_df.genetic_total)
-accuracy_direct = cor(merged_df.EBV, merged_df.genetic_direct)
-accuracy_indirect = cor(merged_df.EBV, merged_df.genetic_indirect)
+# Merge with true breeding values
+merged_df = innerjoin(ebv_df, pheno_df[:, [:ID, :genetic_total, :genetic_direct, :genetic_indirect, :trait1]], on=:ID)
+merged_epv = innerjoin(epv_df, pheno_df[:, [:ID, :genetic_total, :genetic_direct, :genetic_indirect, :trait1]], on=:ID)
+
+# Calculate EBV accuracy metrics
+ebv_accuracy_total = cor(merged_df.EBV, merged_df.genetic_total)
+ebv_accuracy_direct = cor(merged_df.EBV, merged_df.genetic_direct)
+ebv_accuracy_indirect = cor(merged_df.EBV, merged_df.genetic_indirect)
+
+# Calculate EPV accuracy metrics
+epv_accuracy_total = cor(merged_epv.EBV, merged_epv.genetic_total)
+epv_accuracy_direct = cor(merged_epv.EBV, merged_epv.genetic_direct)
+epv_accuracy_indirect = cor(merged_epv.EBV, merged_epv.genetic_indirect)
+epv_accuracy_trait = cor(merged_epv.EBV, merged_epv.trait1)
 
 println()
 println("=" ^ 70)
@@ -125,16 +136,28 @@ println("  SNPs: 1000 (927 after MAF filtering)")
 println("  Omics: 10")
 println("  Target heritability: 0.5 (20% direct, 80% indirect)")
 println()
-println("ACCURACY METRICS (TARGET VALUES FOR PYNNMM):")
+println("EBV ACCURACY METRICS (Estimated Breeding Value - from predicted omics):")
 println("  ┌────────────────────────────────────────┐")
-println("  │ cor(EBV, genetic_total):    $(round(accuracy_total, digits=4))  │")
-println("  │ cor(EBV, genetic_direct):   $(round(accuracy_direct, digits=4))  │")
-println("  │ cor(EBV, genetic_indirect): $(round(accuracy_indirect, digits=4))  │")
+println("  │ cor(EBV, genetic_total):    $(round(ebv_accuracy_total, digits=4))  │")
+println("  │ cor(EBV, genetic_direct):   $(round(ebv_accuracy_direct, digits=4))  │")
+println("  │ cor(EBV, genetic_indirect): $(round(ebv_accuracy_indirect, digits=4))  │")
+println("  └────────────────────────────────────────┘")
+println()
+println("EPV ACCURACY METRICS (Estimated Phenotypic Value - from observed omics):")
+println("  ┌────────────────────────────────────────┐")
+println("  │ cor(EPV, genetic_total):    $(round(epv_accuracy_total, digits=4))  │")
+println("  │ cor(EPV, genetic_direct):   $(round(epv_accuracy_direct, digits=4))  │")
+println("  │ cor(EPV, genetic_indirect): $(round(epv_accuracy_indirect, digits=4))  │")
+println("  │ cor(EPV, trait1):           $(round(epv_accuracy_trait, digits=4))  │")
 println("  └────────────────────────────────────────┘")
 println()
 println("EBV Statistics:")
 println("  Mean: $(round(mean(merged_df.EBV), digits=4))")
 println("  Std:  $(round(std(merged_df.EBV), digits=4))")
+println()
+println("EPV Statistics:")
+println("  Mean: $(round(mean(merged_epv.EBV), digits=4))")
+println("  Std:  $(round(std(merged_epv.EBV), digits=4))")
 println()
 println("=" ^ 70)
 println()

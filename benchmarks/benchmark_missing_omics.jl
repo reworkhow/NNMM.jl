@@ -52,9 +52,13 @@ println()
 results = DataFrame(
     missing_pct = Float64[],
     n_missing_cells = Int[],
-    accuracy_total = Float64[],
-    accuracy_direct = Float64[],
-    accuracy_indirect = Float64[]
+    ebv_accuracy_total = Float64[],
+    ebv_accuracy_direct = Float64[],
+    ebv_accuracy_indirect = Float64[],
+    epv_accuracy_total = Float64[],
+    epv_accuracy_direct = Float64[],
+    epv_accuracy_indirect = Float64[],
+    epv_accuracy_trait = Float64[]
 )
 
 for missing_pct in MISSING_PERCENTAGES
@@ -137,20 +141,35 @@ for missing_pct in MISSING_PERCENTAGES
     # Get EBV results
     ebv_df = result["EBV_NonLinear"]
     ebv_df.ID = string.(ebv_df.ID)
+    
+    # Get EPV results
+    epv_df = result["EPV_NonLinear"]
+    epv_df.ID = string.(epv_df.ID)
+    
     pheno_df_copy = copy(pheno_df)
     pheno_df_copy.ID = string.(pheno_df_copy.ID)
     
     # Merge with true breeding values
-    merged_df = innerjoin(ebv_df, pheno_df_copy[:, [:ID, :genetic_total, :genetic_direct, :genetic_indirect]], on=:ID)
+    merged_df = innerjoin(ebv_df, pheno_df_copy[:, [:ID, :genetic_total, :genetic_direct, :genetic_indirect, :trait1]], on=:ID)
+    merged_epv = innerjoin(epv_df, pheno_df_copy[:, [:ID, :genetic_total, :genetic_direct, :genetic_indirect, :trait1]], on=:ID)
     
-    # Calculate accuracy metrics
-    accuracy_total = cor(merged_df.EBV, merged_df.genetic_total)
-    accuracy_direct = cor(merged_df.EBV, merged_df.genetic_direct)
-    accuracy_indirect = cor(merged_df.EBV, merged_df.genetic_indirect)
+    # Calculate EBV accuracy metrics
+    ebv_accuracy_total = cor(merged_df.EBV, merged_df.genetic_total)
+    ebv_accuracy_direct = cor(merged_df.EBV, merged_df.genetic_direct)
+    ebv_accuracy_indirect = cor(merged_df.EBV, merged_df.genetic_indirect)
     
-    push!(results, (missing_pct, n_missing_cells, accuracy_total, accuracy_direct, accuracy_indirect))
+    # Calculate EPV accuracy metrics
+    epv_accuracy_total = cor(merged_epv.EBV, merged_epv.genetic_total)
+    epv_accuracy_direct = cor(merged_epv.EBV, merged_epv.genetic_direct)
+    epv_accuracy_indirect = cor(merged_epv.EBV, merged_epv.genetic_indirect)
+    epv_accuracy_trait = cor(merged_epv.EBV, merged_epv.trait1)
     
-    println("  Accuracy: cor(EBV, genetic_total) = $(round(accuracy_total, digits=4))")
+    push!(results, (missing_pct, n_missing_cells, 
+        ebv_accuracy_total, ebv_accuracy_direct, ebv_accuracy_indirect,
+        epv_accuracy_total, epv_accuracy_direct, epv_accuracy_indirect, epv_accuracy_trait))
+    
+    println("  EBV Accuracy: cor(EBV, genetic_total) = $(round(ebv_accuracy_total, digits=4))")
+    println("  EPV Accuracy: cor(EPV, genetic_total) = $(round(epv_accuracy_total, digits=4))")
     println()
     
     # Cleanup
@@ -176,7 +195,7 @@ println("  SNPs: 1000 (927 after MAF filtering)")
 println("  Omics: $n_omics")
 println("  Target heritability: 0.5 (20% direct, 80% indirect)")
 println()
-println("ACCURACY METRICS BY MISSING PERCENTAGE:")
+println("EBV ACCURACY METRICS BY MISSING PERCENTAGE:")
 println()
 println("┌─────────────┬───────────────┬─────────────────┬────────────────┬──────────────────┐")
 println("│ Missing %   │ Missing Cells │ cor(EBV,total)  │ cor(EBV,direct)│ cor(EBV,indirect)│")
@@ -184,21 +203,47 @@ println("├─────────────┼────────�
 for row in eachrow(results)
     pct_str = lpad("$(Int(row.missing_pct * 100))%", 5)
     cells_str = lpad(string(row.n_missing_cells), 10)
-    total_str = lpad(string(round(row.accuracy_total, digits=4)), 10)
-    direct_str = lpad(string(round(row.accuracy_direct, digits=4)), 10)
-    indirect_str = lpad(string(round(row.accuracy_indirect, digits=4)), 10)
+    total_str = lpad(string(round(row.ebv_accuracy_total, digits=4)), 10)
+    direct_str = lpad(string(round(row.ebv_accuracy_direct, digits=4)), 10)
+    indirect_str = lpad(string(round(row.ebv_accuracy_indirect, digits=4)), 10)
     println("│ $pct_str       │ $cells_str    │ $total_str      │ $direct_str     │ $indirect_str       │")
 end
 println("└─────────────┴───────────────┴─────────────────┴────────────────┴──────────────────┘")
 println()
 
+println("EPV ACCURACY METRICS BY MISSING PERCENTAGE:")
+println()
+println("┌─────────────┬───────────────┬─────────────────┬────────────────┬──────────────────┬────────────────┐")
+println("│ Missing %   │ Missing Cells │ cor(EPV,total)  │ cor(EPV,direct)│ cor(EPV,indirect)│ cor(EPV,trait) │")
+println("├─────────────┼───────────────┼─────────────────┼────────────────┼──────────────────┼────────────────┤")
+for row in eachrow(results)
+    pct_str = lpad("$(Int(row.missing_pct * 100))%", 5)
+    cells_str = lpad(string(row.n_missing_cells), 10)
+    total_str = lpad(string(round(row.epv_accuracy_total, digits=4)), 10)
+    direct_str = lpad(string(round(row.epv_accuracy_direct, digits=4)), 10)
+    indirect_str = lpad(string(round(row.epv_accuracy_indirect, digits=4)), 10)
+    trait_str = lpad(string(round(row.epv_accuracy_trait, digits=4)), 10)
+    println("│ $pct_str       │ $cells_str    │ $total_str      │ $direct_str     │ $indirect_str       │ $trait_str     │")
+end
+println("└─────────────┴───────────────┴─────────────────┴────────────────┴──────────────────┴────────────────┘")
+println()
+
 # Calculate degradation
 if nrow(results) > 1
-    baseline = results[1, :accuracy_total]
-    println("Accuracy degradation from baseline (0% missing):")
+    baseline_ebv = results[1, :ebv_accuracy_total]
+    baseline_epv = results[1, :epv_accuracy_total]
+    println("EBV Accuracy degradation from baseline (0% missing):")
     for row in eachrow(results)
         if row.missing_pct > 0
-            degradation = (baseline - row.accuracy_total) / baseline * 100
+            degradation = (baseline_ebv - row.ebv_accuracy_total) / baseline_ebv * 100
+            println("  $(Int(row.missing_pct * 100))% missing: $(round(degradation, digits=2))% reduction")
+        end
+    end
+    println()
+    println("EPV Accuracy degradation from baseline (0% missing):")
+    for row in eachrow(results)
+        if row.missing_pct > 0
+            degradation = (baseline_epv - row.epv_accuracy_total) / baseline_epv * 100
             println("  $(Int(row.missing_pct * 100))% missing: $(round(degradation, digits=2))% reduction")
         end
     end

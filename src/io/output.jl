@@ -184,6 +184,17 @@ function output_result(mme,output_folder,
               output[i] = DataFrame([vec(names) samplemean samplevar],[:Covariance,:Estimate,:SD])
           end
       end
+      # Read EPV_NonLinear (Estimated Phenotypic Value using observed omics)
+      if mme.nonlinear_function != false
+          EPVsamplesfile = output_file*"_EPV_NonLinear.txt"
+          if isfile(EPVsamplesfile)
+              EPVsamples,EPV_IDs = readdlm(EPVsamplesfile,',',header=true)
+              EPV_mean = vec(mean(EPVsamples,dims=1))
+              EPV_var  = vec(var(EPVsamples,dims=1))
+              # EPV has IDs for phenotyped individuals (may be different from all individuals)
+              output["EPV_NonLinear"] = DataFrame([vec(EPV_IDs) EPV_mean EPV_var],[:ID,:EPV,:PEV])
+          end
+      end
       if mme.nonlinear_function != false && mme.is_activation_fcn == true  #Neural Network with activation function
           myvar         = "neural_networks_bias_and_weights"
           samplesfile   = output_file*"_"*myvar*".txt"
@@ -346,6 +357,7 @@ function output_MCMC_samples_setup(mme,nIter,output_samples_frequency,file_name=
       end
       if mme.nonlinear_function != false  #NNBayes
           push!(outvar,"EBV_NonLinear")
+          # EPV_NonLinear is set up separately in mcmc_bayesian.jl since it needs mme2
           if mme.is_activation_fcn == true #Neural Network with activation function
               push!(outvar,"neural_networks_bias_and_weights")
           end

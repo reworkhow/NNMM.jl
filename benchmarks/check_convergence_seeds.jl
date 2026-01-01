@@ -47,9 +47,12 @@ println()
 # Store results
 results = DataFrame(
     seed = Int[],
-    accuracy_total = Float64[],
-    accuracy_direct = Float64[],
-    accuracy_indirect = Float64[],
+    ebv_accuracy_total = Float64[],
+    ebv_accuracy_direct = Float64[],
+    ebv_accuracy_indirect = Float64[],
+    epv_accuracy_total = Float64[],
+    epv_accuracy_direct = Float64[],
+    epv_accuracy_indirect = Float64[],
     time_seconds = Float64[]
 )
 
@@ -113,25 +116,39 @@ for (i, seed) in enumerate(SEEDS)
     # Get EBV results
     ebv_df = result["EBV_NonLinear"]
     ebv_df.ID = string.(ebv_df.ID)
+    
+    # Get EPV results
+    epv_df = result["EPV_NonLinear"]
+    epv_df.ID = string.(epv_df.ID)
+    
     pheno_df_copy = copy(pheno_df)
     pheno_df_copy.ID = string.(pheno_df_copy.ID)
     
     # Merge and calculate accuracy
     merged_df = innerjoin(ebv_df, pheno_df_copy[:, [:ID, :genetic_total, :genetic_direct, :genetic_indirect]], on=:ID)
+    merged_epv = innerjoin(epv_df, pheno_df_copy[:, [:ID, :genetic_total, :genetic_direct, :genetic_indirect]], on=:ID)
     
-    accuracy_total = cor(merged_df.EBV, merged_df.genetic_total)
-    accuracy_direct = cor(merged_df.EBV, merged_df.genetic_direct)
-    accuracy_indirect = cor(merged_df.EBV, merged_df.genetic_indirect)
+    ebv_accuracy_total = cor(merged_df.EBV, merged_df.genetic_total)
+    ebv_accuracy_direct = cor(merged_df.EBV, merged_df.genetic_direct)
+    ebv_accuracy_indirect = cor(merged_df.EBV, merged_df.genetic_indirect)
+    
+    epv_accuracy_total = cor(merged_epv.EBV, merged_epv.genetic_total)
+    epv_accuracy_direct = cor(merged_epv.EBV, merged_epv.genetic_direct)
+    epv_accuracy_indirect = cor(merged_epv.EBV, merged_epv.genetic_indirect)
     
     push!(results, (
         seed = seed,
-        accuracy_total = accuracy_total,
-        accuracy_direct = accuracy_direct,
-        accuracy_indirect = accuracy_indirect,
+        ebv_accuracy_total = ebv_accuracy_total,
+        ebv_accuracy_direct = ebv_accuracy_direct,
+        ebv_accuracy_indirect = ebv_accuracy_indirect,
+        epv_accuracy_total = epv_accuracy_total,
+        epv_accuracy_direct = epv_accuracy_direct,
+        epv_accuracy_indirect = epv_accuracy_indirect,
         time_seconds = elapsed
     ))
     
-    println("  Accuracy (genetic_total): $(round(accuracy_total, digits=4))")
+    println("  EBV Accuracy (genetic_total): $(round(ebv_accuracy_total, digits=4))")
+    println("  EPV Accuracy (genetic_total): $(round(epv_accuracy_total, digits=4))")
     println("  Time: $(round(elapsed, digits=1))s")
     
     # Cleanup
@@ -144,28 +161,45 @@ println("CONVERGENCE SUMMARY")
 println("=" ^ 70)
 println()
 
+println("EBV ACCURACY:")
 println("┌────────┬─────────────────┬─────────────────┬─────────────────┬──────────┐")
 println("│  Seed  │ genetic_total   │ genetic_direct  │ genetic_indirect│ Time (s) │")
 println("├────────┼─────────────────┼─────────────────┼─────────────────┼──────────┤")
 
 for row in eachrow(results)
-    println("│ $(lpad(row.seed, 6)) │ $(lpad(round(row.accuracy_total, digits=4), 15)) │ $(lpad(round(row.accuracy_direct, digits=4), 15)) │ $(lpad(round(row.accuracy_indirect, digits=4), 15)) │ $(lpad(round(row.time_seconds, digits=1), 8)) │")
+    println("│ $(lpad(row.seed, 6)) │ $(lpad(round(row.ebv_accuracy_total, digits=4), 15)) │ $(lpad(round(row.ebv_accuracy_direct, digits=4), 15)) │ $(lpad(round(row.ebv_accuracy_indirect, digits=4), 15)) │ $(lpad(round(row.time_seconds, digits=1), 8)) │")
 end
 
 println("├────────┼─────────────────┼─────────────────┼─────────────────┼──────────┤")
-println("│  Mean  │ $(lpad(round(mean(results.accuracy_total), digits=4), 15)) │ $(lpad(round(mean(results.accuracy_direct), digits=4), 15)) │ $(lpad(round(mean(results.accuracy_indirect), digits=4), 15)) │ $(lpad(round(mean(results.time_seconds), digits=1), 8)) │")
-println("│  Std   │ $(lpad(round(std(results.accuracy_total), digits=4), 15)) │ $(lpad(round(std(results.accuracy_direct), digits=4), 15)) │ $(lpad(round(std(results.accuracy_indirect), digits=4), 15)) │ $(lpad(round(std(results.time_seconds), digits=1), 8)) │")
+println("│  Mean  │ $(lpad(round(mean(results.ebv_accuracy_total), digits=4), 15)) │ $(lpad(round(mean(results.ebv_accuracy_direct), digits=4), 15)) │ $(lpad(round(mean(results.ebv_accuracy_indirect), digits=4), 15)) │ $(lpad(round(mean(results.time_seconds), digits=1), 8)) │")
+println("│  Std   │ $(lpad(round(std(results.ebv_accuracy_total), digits=4), 15)) │ $(lpad(round(std(results.ebv_accuracy_direct), digits=4), 15)) │ $(lpad(round(std(results.ebv_accuracy_indirect), digits=4), 15)) │ $(lpad(round(std(results.time_seconds), digits=1), 8)) │")
 println("└────────┴─────────────────┴─────────────────┴─────────────────┴──────────┘")
+println()
+
+println("EPV ACCURACY:")
+println("┌────────┬─────────────────┬─────────────────┬─────────────────┐")
+println("│  Seed  │ genetic_total   │ genetic_direct  │ genetic_indirect│")
+println("├────────┼─────────────────┼─────────────────┼─────────────────┤")
+
+for row in eachrow(results)
+    println("│ $(lpad(row.seed, 6)) │ $(lpad(round(row.epv_accuracy_total, digits=4), 15)) │ $(lpad(round(row.epv_accuracy_direct, digits=4), 15)) │ $(lpad(round(row.epv_accuracy_indirect, digits=4), 15)) │")
+end
+
+println("├────────┼─────────────────┼─────────────────┼─────────────────┤")
+println("│  Mean  │ $(lpad(round(mean(results.epv_accuracy_total), digits=4), 15)) │ $(lpad(round(mean(results.epv_accuracy_direct), digits=4), 15)) │ $(lpad(round(mean(results.epv_accuracy_indirect), digits=4), 15)) │")
+println("│  Std   │ $(lpad(round(std(results.epv_accuracy_total), digits=4), 15)) │ $(lpad(round(std(results.epv_accuracy_direct), digits=4), 15)) │ $(lpad(round(std(results.epv_accuracy_indirect), digits=4), 15)) │")
+println("└────────┴─────────────────┴─────────────────┴─────────────────┘")
 
 println()
 println("CONVERGENCE ASSESSMENT:")
-std_total = std(results.accuracy_total)
-if std_total < 0.02
-    println("  ✓ CONVERGED - Standard deviation $(round(std_total, digits=4)) < 0.02")
-elseif std_total < 0.05
-    println("  ⚠ MARGINAL - Standard deviation $(round(std_total, digits=4)) between 0.02 and 0.05")
+ebv_std = std(results.ebv_accuracy_total)
+epv_std = std(results.epv_accuracy_total)
+if ebv_std < 0.02 && epv_std < 0.02
+    println("  ✓ CONVERGED - EBV std=$(round(ebv_std, digits=4)), EPV std=$(round(epv_std, digits=4)) < 0.02")
+elseif ebv_std < 0.05 && epv_std < 0.05
+    println("  ⚠ MARGINAL - EBV std=$(round(ebv_std, digits=4)), EPV std=$(round(epv_std, digits=4)) between 0.02 and 0.05")
 else
-    println("  ✗ NOT CONVERGED - Standard deviation $(round(std_total, digits=4)) > 0.05")
+    println("  ✗ NOT CONVERGED - EBV std=$(round(ebv_std, digits=4)), EPV std=$(round(epv_std, digits=4)) > 0.05")
 end
 
 println()

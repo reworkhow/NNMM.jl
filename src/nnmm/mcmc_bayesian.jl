@@ -130,6 +130,17 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         outfile=output_MCMC_samples_setup(mme1,chain_length-burnin,
                                           output_samples_frequency,
                                           output_folder*"/MCMC_samples")
+        # Set up Layer 2 output files for residual and effect variances
+        outfile["layer2_residual_variance"] = open(output_folder*"/MCMC_samples_layer2_residual_variance.txt","w")
+        outfile["layer2_effect_variance"] = open(output_folder*"/MCMC_samples_layer2_effect_variance.txt","w")
+        println("The file "*output_folder*"/MCMC_samples_layer2_residual_variance.txt is created to save MCMC samples for layer2_residual_variance.")
+        println("The file "*output_folder*"/MCMC_samples_layer2_effect_variance.txt is created to save MCMC samples for layer2_effect_variance.")
+        # Set up EPV (Estimated Phenotypic Value) output file
+        # EPV uses OBSERVED omics instead of predicted omics (EBV uses predicted)
+        if nonlinear_function != false
+            outfile["EPV_NonLinear"] = open(output_folder*"/MCMC_samples_EPV_NonLinear.txt","w")
+            println("The file "*output_folder*"/MCMC_samples_EPV_NonLinear.txt is created to save MCMC samples for EPV_NonLinear.")
+        end
     end
     ############################################################################
     # MCMC (starting values for sol (zeros);  mme.RNew; G0 are used)
@@ -280,6 +291,11 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         polygenic_pos = findfirst(i -> i.randomType=="A", mme2.rndTrmVec)
     end
 
+    # Write header for EPV_NonLinear file (IDs of phenotyped individuals)
+    if output_samples_frequency != 0 && nonlinear_function != false && mme2.M != 0 && length(mme2.M) > 0
+        epv_ids = mme2.M[1].aligned_obsID_w_phenotype
+        writedlm(outfile["EPV_NonLinear"], transubstrarr(epv_ids), ',')
+    end
 
     @showprogress "running MCMC ..." for iter=1:chain_length
         
@@ -708,6 +724,23 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
             #  if causal_structure != false
             #      writedlm(causal_structure_outfile,sample4λ_vec',',')
             #  end
+            # Save Layer 2 variances
+            writedlm(outfile["layer2_residual_variance"], mme2.R.val', ',')
+            if mme2.M != 0 && length(mme2.M) > 0
+                writedlm(outfile["layer2_effect_variance"], mme2.M[1].G.val', ',')
+            end
+            # Save EPV (Estimated Phenotypic Value) using OBSERVED omics
+            # EPV = activation(observed_omics) * weights_NN
+            # This complements EBV_NonLinear which uses PREDICTED omics from genotypes
+            if mme1.nonlinear_function != false && mme2.M != 0 && length(mme2.M) > 0
+                observed_omics = mme2.M[1].aligned_omics_w_phenotype
+                if mme1.is_activation_fcn == true
+                    EPV_NN = mme1.nonlinear_function.(observed_omics) * mme1.weights_NN
+                else
+                    EPV_NN = mme1.nonlinear_function.(Tuple([view(observed_omics,:,i) for i in 1:size(observed_omics,2)])...)
+                end
+                writedlm(outfile["EPV_NonLinear"], EPV_NN', ',')
+            end
         end
         ########################################################################
         # 3.2 Printout

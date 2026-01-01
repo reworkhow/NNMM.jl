@@ -35,6 +35,10 @@
 | Mean | -0.0 |
 | Std | 358.712 |
 
+> **Note on EBV Scale**: The large EBV std (358.7 vs phenotype std ~1.4) is due to weight drift 
+> in the Layer 2 (omics → phenotype) sampler. This affects absolute scale but NOT rankings 
+> (correlation with true values is preserved). See "Known Issues" section below.
+
 ---
 
 ## Missing Omics Benchmark (`benchmark_missing_omics.jl`)
@@ -166,4 +170,33 @@ With the default `constraint=true`, multi-threading can provide speedup proporti
 
 ---
 
-*Generated: 2025-12-31 (Updated: constraint=true benchmark results)*
+## Known Issues
+
+### Layer 2 Weight Drift (EBV Scale Inflation)
+
+**Issue**: The EBV_NonLinear scale grows significantly larger than the phenotype scale (e.g., std=358 vs std=1.4).
+
+**Root Cause**: 
+- Layer 2 weights (α₂) drift due to correlated omics predictors
+- The effect variance (σ²_α₂) grows unboundedly from ~0.09 to ~1000+ over 1000 iterations
+- Feedback loop: larger weights → larger variance estimate → even larger weights
+
+**Impact**:
+- Absolute EBV values are inflated
+- Rankings and correlations with true values are PRESERVED (0.85 correlation)
+- Cross-package comparison requires standardization (Z-scores)
+
+**Diagnostic**: 
+- Check `MCMC_samples_layer2_effect_variance.txt` - values should stay stable, not grow
+- Check `MCMC_samples_layer2_residual_variance.txt` - should stay ~0.5-1.0
+
+**Workarounds**:
+1. Use standardized EBVs (Z-scores) for interpretation
+2. Compare rankings/correlations rather than absolute values
+3. For cross-package comparison, use Spearman correlation
+
+**Planned Fix**: Implement stronger prior constraints on Layer 2 effect variance when n_omics is small (<50).
+
+---
+
+*Generated: 2025-12-31 (Updated: constraint=true benchmark results, added Layer 2 variance monitoring)*
