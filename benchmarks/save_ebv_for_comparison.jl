@@ -107,8 +107,9 @@ CSV.write(epv_output_path, epv_df)
 println()
 println("✅ EPVs saved to: $epv_output_path")
 println("   Individuals: $(nrow(epv_df))")
-println("   Mean EPV: $(round(mean(epv_df.EBV), digits=4))")
-println("   Std EPV:  $(round(std(epv_df.EBV), digits=4))")
+epv_col = hasproperty(epv_df, :EPV) ? epv_df.EPV : epv_df.EBV
+println("   Mean EPV: $(round(mean(epv_col), digits=4))")
+println("   Std EPV:  $(round(std(epv_col), digits=4))")
 
 # Cleanup temp directory
 rm(benchmark_dir, recursive=true)

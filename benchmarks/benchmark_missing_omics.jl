@@ -159,10 +159,11 @@ for missing_pct in MISSING_PERCENTAGES
     ebv_accuracy_indirect = cor(merged_df.EBV, merged_df.genetic_indirect)
     
     # Calculate EPV accuracy metrics
-    epv_accuracy_total = cor(merged_epv.EBV, merged_epv.genetic_total)
-    epv_accuracy_direct = cor(merged_epv.EBV, merged_epv.genetic_direct)
-    epv_accuracy_indirect = cor(merged_epv.EBV, merged_epv.genetic_indirect)
-    epv_accuracy_trait = cor(merged_epv.EBV, merged_epv.trait1)
+    epv_col = hasproperty(merged_epv, :EPV) ? merged_epv.EPV : merged_epv.EBV
+    epv_accuracy_total = cor(epv_col, merged_epv.genetic_total)
+    epv_accuracy_direct = cor(epv_col, merged_epv.genetic_direct)
+    epv_accuracy_indirect = cor(epv_col, merged_epv.genetic_indirect)
+    epv_accuracy_trait = cor(epv_col, merged_epv.trait1)
     
     push!(results, (missing_pct, n_missing_cells, 
         ebv_accuracy_total, ebv_accuracy_direct, ebv_accuracy_indirect,

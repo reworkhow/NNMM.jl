@@ -20,7 +20,7 @@
 
 ## Full Omics Benchmark (`benchmark_accuracy.jl`)
 
-### Accuracy Metrics
+### EBV Accuracy Metrics (Estimated Breeding Value - from predicted omics)
 
 | Metric | Value |
 |--------|-------|
@@ -28,22 +28,30 @@
 | cor(EBV, genetic_direct) | 0.0399 |
 | cor(EBV, genetic_indirect) | 0.9358 |
 
-### EBV Statistics
+### EPV Accuracy Metrics (Estimated Phenotypic Value - from observed omics)
 
-| Statistic | Value |
-|-----------|-------|
-| Mean | -0.0 |
-| Std | 358.712 |
+| Metric | Value |
+|--------|-------|
+| cor(EPV, genetic_total) | 0.4996 |
+| cor(EPV, genetic_direct) | 0.0144 |
+| cor(EPV, genetic_indirect) | 0.5513 |
+| cor(EPV, trait1) | **0.8254** |
 
-> **Note on EBV Scale**: The large EBV std (358.7 vs phenotype std ~1.4) is due to weight drift 
-> in the Layer 2 (omics → phenotype) sampler. This affects absolute scale but NOT rankings 
-> (correlation with true values is preserved). See "Known Issues" section below.
+### EBV/EPV Statistics
+
+| Statistic | EBV | EPV |
+|-----------|-----|-----|
+| Mean | -0.0 | 2.31 |
+| Std | 358.7 | 691.1 |
+
+> **Note on Scale**: The large EBV/EPV std is due to weight drift in the Layer 2 (omics → phenotype) sampler. 
+> This affects absolute scale but NOT rankings (correlation with true values is preserved).
 
 ---
 
 ## Missing Omics Benchmark (`benchmark_missing_omics.jl`)
 
-### Accuracy by Missing Percentage
+### EBV Accuracy by Missing Percentage
 
 | Missing % | Missing Cells | cor(EBV, total) | cor(EBV, direct) | cor(EBV, indirect) |
 |-----------|---------------|-----------------|------------------|---------------------|
@@ -51,23 +59,93 @@
 | 30% | 10,600 | **0.7873** | 0.0685 | 0.8460 |
 | 50% | 17,670 | **0.7365** | 0.1497 | 0.7486 |
 
+### EPV Accuracy by Missing Percentage
+
+| Missing % | cor(EPV, total) | cor(EPV, direct) | cor(EPV, indirect) | cor(EPV, trait) |
+|-----------|-----------------|------------------|---------------------|-----------------|
+| 0% | 0.4996 | 0.0144 | 0.5513 | 0.8254 |
+| 30% | 0.4067 | 0.0384 | 0.4355 | 0.6682 |
+| 50% | 0.3583 | 0.0788 | 0.3612 | 0.6118 |
+
 ### Accuracy Degradation from Baseline
 
-| Missing % | Reduction |
-|-----------|-----------|
-| 30% | 7.9% |
-| 50% | 13.8% |
+| Missing % | EBV Reduction | EPV Reduction |
+|-----------|---------------|---------------|
+| 30% | 7.9% | 18.6% |
+| 50% | 13.8% | 28.3% |
 
 ---
 
-## PyNNMM Target Values
+## Convergence Check (`check_convergence_seeds.jl`)
 
-PyNNMM should achieve similar accuracy metrics:
-- Full omics: cor(EBV, genetic_total) ≈ 0.85
-- 30% missing: cor(EBV, genetic_total) ≈ 0.79
-- 50% missing: cor(EBV, genetic_total) ≈ 0.74
+### EBV Convergence (5 seeds × 1000 iterations)
 
-**Tolerance**: Results within ±0.05 are considered acceptable.
+| Seed | genetic_total | genetic_direct | genetic_indirect | Time (s) |
+|------|---------------|----------------|------------------|----------|
+| 42 | 0.8549 | 0.0399 | 0.9358 | 151.6 |
+| 123 | 0.8556 | 0.0411 | 0.9361 | 107.4 |
+| 456 | 0.8547 | 0.0405 | 0.9354 | 105.4 |
+| 789 | 0.8546 | 0.0394 | 0.9358 | 80.3 |
+| 2024 | 0.8563 | 0.0407 | 0.9370 | 64.8 |
+| **Mean** | **0.8552** | **0.0403** | **0.9360** | 101.9 |
+| **Std** | **0.0007** | **0.0007** | **0.0006** | 33.0 |
+
+### EPV Convergence (5 seeds × 1000 iterations)
+
+| Seed | genetic_total | genetic_direct | genetic_indirect |
+|------|---------------|----------------|------------------|
+| 42 | 0.4996 | 0.0144 | 0.5513 |
+| 123 | 0.4995 | 0.0144 | 0.5513 |
+| 456 | 0.4995 | 0.0144 | 0.5513 |
+| 789 | 0.4996 | 0.0144 | 0.5513 |
+| 2024 | 0.4996 | 0.0145 | 0.5513 |
+| **Mean** | **0.4996** | **0.0144** | **0.5513** |
+| **Std** | **0.0000** | **0.0000** | **0.0000** |
+
+✅ **CONVERGED**: Very low standard deviation indicates stable results across different seeds.
+
+---
+
+## Performance Benchmark (`benchmark_performance.jl`)
+
+### Speed (3534 individuals, 927 SNPs, 10 omics)
+
+| Chain | Burnin | Time (s) | Iter/sec |
+|-------|--------|----------|----------|
+| 100 | 20 | 21.91 ± 1.61 | 4.6 |
+| 500 | 100 | 58.39 ± 2.67 | 8.6 |
+| 1000 | 200 | 69.84 ± 23.09 | 14.3 |
+
+---
+
+## Cross-Package Comparison
+
+### EBV/EPV Correlation (NNMM.jl vs PyNNMM)
+
+| Metric | Pearson | Spearman |
+|--------|---------|----------|
+| EBV (genetic) | 0.7647 | 0.7500 |
+| EPV (phenotypic) | 0.7284 | 0.7141 |
+
+### Accuracy Comparison
+
+| Metric | NNMM.jl | PyNNMM | Gap |
+|--------|---------|--------|-----|
+| cor(EBV, genetic_total) | **0.8549** | 0.8059 | 0.0490 |
+| cor(EBV, genetic_direct) | 0.0399 | 0.4115 | -0.3716 |
+| cor(EBV, genetic_indirect) | **0.9358** | 0.6952 | 0.2406 |
+| cor(EPV, genetic_total) | **0.4996** | 0.3441 | 0.1555 |
+
+### Performance Comparison
+
+| Chain | NNMM.jl (s) | PyNNMM (s) | Ratio |
+|-------|-------------|------------|-------|
+| 100 | 21.91 | 7.54 | 2.91x slower |
+| 500 | 58.39 | 43.15 | 1.35x slower |
+| 1000 | 69.84 | 80.92 | 0.86x faster |
+
+> **Note**: PyNNMM is faster for short chains due to startup overhead in Julia JIT compilation.
+> For longer chains (1000+), NNMM.jl reaches comparable or better performance.
 
 ---
 
@@ -79,94 +157,28 @@ julia --project=. benchmarks/benchmark_accuracy.jl
 
 # Missing omics benchmark
 julia --project=. benchmarks/benchmark_missing_omics.jl
+
+# Convergence check (multiple seeds)
+julia --project=. benchmarks/check_convergence_seeds.jl
+
+# Performance benchmark
+julia --project=. benchmarks/benchmark_performance.jl
+
+# Save EBVs for cross-package comparison
+julia --project=. benchmarks/save_ebv_for_comparison.jl
 ```
 
 ---
 
-## Performance Benchmark
+## Key Findings
 
-### Speed (1000 iterations, 3534 individuals, 927 SNPs, 10 omics)
+1. **EBV vs EPV**: EBV (from predicted omics) shows much higher correlation with genetic values (0.85) compared to EPV (from observed omics, 0.50). This is expected since EBV captures the genetic component while EPV includes environmental noise from observed omics.
 
-| Threads | Time (s) | Iterations/sec | Speedup |
-|---------|----------|----------------|---------|
-| 1 (single) | ~277s | **3.6** | 1.0x |
-| 10 (multi) | ~128s | **7.8** | 2.2x |
+2. **Indirect Effects**: NNMM.jl shows very high correlation with genetic_indirect (0.94), indicating the model effectively captures the indirect genetic effects mediated through omics.
 
-*Note: Multi-threading enabled by default with `constraint=true`*
+3. **Missing Data Robustness**: EBV accuracy degrades gracefully with missing omics data (13.8% reduction at 50% missing), while EPV degrades more significantly (28.3%).
 
-### Cross-Package Comparison
-
-| Package | Accuracy (full) | Accuracy (30% missing) | Speed (iter/s) |
-|---------|-----------------|------------------------|----------------|
-| **NNMM.jl** | **0.8552** | **0.7873** | **3.6 - 7.8** |
-| PyNNMM | 0.8127 | 0.7711 | 9.6 |
-| Parity | 95% | 98% | varies |
-
----
-
-## Convergence Check (5 seeds × 1000 iterations, constraint=true)
-
-| Seed | genetic_total | genetic_direct | genetic_indirect | Time (s) |
-|------|---------------|----------------|------------------|----------|
-| 42 | 0.8549 | 0.0399 | 0.9358 | 301.6 |
-| 123 | 0.8556 | 0.0411 | 0.9361 | 267.5 |
-| 456 | 0.8547 | 0.0405 | 0.9354 | 380.8 |
-| 789 | 0.8546 | 0.0394 | 0.9358 | 228.4 |
-| 2024 | 0.8563 | 0.0407 | 0.9370 | 226.4 |
-| **Mean** | **0.8552** | **0.0403** | **0.9360** | 281.0 |
-| **Std** | **0.0007** | **0.0007** | **0.0006** | 63.9 |
-
-✅ **CONVERGED**: Very low standard deviation (0.0007) indicates stable results across different seeds.
-
----
-
-## Multi-Threading
-
-NNMM.jl supports multi-threaded parallelism for the "mega-trait" approach when `constraint=true` (the default).
-
-### Enabling Multi-Threading
-
-```bash
-# Run with 10 threads (one per omics trait)
-julia --project=. -t 10 benchmarks/benchmark_accuracy.jl
-```
-
-### Default Behavior
-
-- **`constraint=true` (default)**: Independent variances per trait, parallelizable with `Threads.@threads`
-- **`constraint=false`**: Full covariance matrix (Inverse-Wishart), sequential only
-
-With the default `constraint=true`, multi-threading can provide speedup proportional to the number of omics traits (up to `n_traits` threads).
-
----
-
-## Gap Analysis (NNMM.jl vs PyNNMM)
-
-### Accuracy Gap: 5% (0.85 vs 0.81)
-
-| Factor | Impact | Description |
-|--------|--------|-------------|
-| RNG differences | Medium | Julia MT19937 vs C++ default_random_engine |
-| Numerical precision | Low | Float32 (Julia) vs Float64 (C++) |
-| Pre-computed matrices | Medium | Julia updates GibbsMats after X2 changes |
-| Posterior mean | Fixed | Both now compute correctly |
-
-### Speed Gap: 2.7x (26 vs 9.6 iter/s)
-
-| Factor | NNMM.jl | PyNNMM | Impact |
-|--------|---------|--------|--------|
-| Compiler | Julia JIT (LLVM) | Clang -O3 | High |
-| BLAS | OpenBLAS (native) | Disabled (Rosetta) | High |
-| Memory layout | Column-major | Row-major | Medium |
-| Pre-computed matrices | GibbsMats cached | Computed on-fly | Medium |
-| Architecture | Native arm64 | x86_64 (Rosetta 2) | High |
-
-### Recommendations for PyNNMM
-
-1. **Use native arm64 Python** - Eliminates Rosetta 2 overhead
-2. **Enable OpenBLAS** - After switching to arm64
-3. **Add OpenMP parallelism** - For mega-trait mode
-4. **Cache column extractions** - Pre-compute like GibbsMats
+4. **Cross-Package Agreement**: EBV correlation between NNMM.jl and PyNNMM is 0.76, indicating moderate agreement. The difference in cor(EBV, genetic_direct) suggests different parameterization strategies.
 
 ---
 
@@ -174,29 +186,18 @@ With the default `constraint=true`, multi-threading can provide speedup proporti
 
 ### Layer 2 Weight Drift (EBV Scale Inflation)
 
-**Issue**: The EBV_NonLinear scale grows significantly larger than the phenotype scale (e.g., std=358 vs std=1.4).
-
-**Root Cause**: 
-- Layer 2 weights (α₂) drift due to correlated omics predictors
-- The effect variance (σ²_α₂) grows unboundedly from ~0.09 to ~1000+ over 1000 iterations
-- Feedback loop: larger weights → larger variance estimate → even larger weights
+**Issue**: The EBV_NonLinear/EPV_NonLinear scale grows significantly larger than the phenotype scale.
 
 **Impact**:
-- Absolute EBV values are inflated
-- Rankings and correlations with true values are PRESERVED (0.85 correlation)
+- Absolute values are inflated
+- Rankings and correlations with true values are PRESERVED
 - Cross-package comparison requires standardization (Z-scores)
 
-**Diagnostic**: 
-- Check `MCMC_samples_layer2_effect_variance.txt` - values should stay stable, not grow
-- Check `MCMC_samples_layer2_residual_variance.txt` - should stay ~0.5-1.0
-
 **Workarounds**:
-1. Use standardized EBVs (Z-scores) for interpretation
+1. Use standardized values (Z-scores) for interpretation
 2. Compare rankings/correlations rather than absolute values
-3. For cross-package comparison, use Spearman correlation
-
-**Planned Fix**: Implement stronger prior constraints on Layer 2 effect variance when n_omics is small (<50).
+3. Use Spearman correlation for cross-package comparison
 
 ---
 
-*Generated: 2025-12-31 (Updated: constraint=true benchmark results, added Layer 2 variance monitoring)*
+*Generated: 2026-01-01 (Updated with EBV/EPV metrics, convergence, performance, and cross-package comparison)*
