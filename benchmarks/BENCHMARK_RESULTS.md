@@ -108,7 +108,7 @@ julia --project=. benchmarks/benchmark_missing_omics.jl
 
 ## Multi-Threading
 
-NNMM.jl supports multi-threaded parallelism for the "mega-trait" approach when `constraint=true`.
+NNMM.jl supports multi-threaded parallelism for the "mega-trait" approach when `constraint=true` (the default).
 
 ### Enabling Multi-Threading
 
@@ -117,13 +117,12 @@ NNMM.jl supports multi-threaded parallelism for the "mega-trait" approach when `
 julia --project=. -t 10 benchmarks/benchmark_accuracy.jl
 ```
 
-### Conditions for Parallel Speedup
+### Default Behavior
 
-Multi-threading provides speedup only when:
-1. `constraint=true` for both residual and marker effect covariances
-2. Each trait can be sampled independently (diagonal covariance)
+- **`constraint=true` (default)**: Independent variances per trait, parallelizable with `Threads.@threads`
+- **`constraint=false`**: Full covariance matrix (Inverse-Wishart), sequential only
 
-The default benchmark uses `constraint=false` (full covariance), so multi-threading has no effect on speed.
+With the default `constraint=true`, multi-threading can provide speedup proportional to the number of omics traits (up to `n_traits` threads).
 
 ---
 

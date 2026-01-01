@@ -4,7 +4,7 @@ function nnmm_get_genotypes(file::Union{AbstractString,Array{Float64,2},Array{Fl
                        ## variance:
                        G_is_marker_variance = false, df = 4.0,
                        estimate_variance = true, estimate_scale = false,
-                       constraint = false, #for multi-trait only, constraint=true means no genetic covariance among traits
+                       constraint = true, #for multi-trait only, constraint=true means independent variances (parallelizable)
                        ## format:
                        separator = ',', header = true, double_precision = false,
                        ## quality control:
@@ -172,7 +172,7 @@ function nnmm_get_omics(file::AbstractString, G = false;
                        ## variance:
                        G_is_marker_variance = false, df = 4.0,
                        estimate_variance = true, estimate_scale = false,
-                       constraint = false, #for multi-trait only, constraint=true means no genetic covariance among traits
+                       constraint = true, #for multi-trait only, constraint=true means independent variances (parallelizable)
                        # format:
                        separator = ',', header = true, 
                        ## quality control:

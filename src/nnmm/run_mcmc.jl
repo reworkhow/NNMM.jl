@@ -158,7 +158,7 @@ function runNNMM(layers, equations;
     if method == "GBLUP"
         error("GBLUP is not supported from 2->3 layers. Try BayesC, RR-BLUP, etc..") #because when omics need imputation, GRM should be calculated in every MCMC iteration
     end
-    printstyled("Note that `constraint` is set to false here forcefully \n",bold=false,color=:green)
+    # Note: constraint defaults to true from Equation struct (independent variances per trait, parallelizable)
     Pi                   = equations[2].Pi
     estimatePi           = equations[2].estimatePi
     G_is_marker_variance = equations[2].G_is_marker_variance #G is omics variance
