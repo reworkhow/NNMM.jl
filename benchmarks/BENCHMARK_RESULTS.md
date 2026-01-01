@@ -78,4 +78,32 @@ julia --project=. benchmarks/benchmark_missing_omics.jl
 
 ---
 
-*Generated: 2025-12-30*
+## Performance Benchmark
+
+### Speed (1000 iterations, 3534 individuals, 927 SNPs, 10 omics)
+
+| Metric | Value |
+|--------|-------|
+| Total time | ~38s |
+| Iterations/sec | **26 iter/s** |
+
+### Cross-Package Comparison
+
+| Package | Accuracy (full) | Accuracy (30% missing) | Speed (iter/s) |
+|---------|-----------------|------------------------|----------------|
+| **NNMM.jl** | **0.8552** | **0.7810** | **26** |
+| PyNNMM | 0.8127 | 0.7711 | 9.6 |
+| Parity | 95% | 99% | 37% |
+
+---
+
+## Convergence Check (5 seeds × 1000 iterations)
+
+| Scenario | Mean Accuracy | Std Dev | Status |
+|----------|---------------|---------|--------|
+| Full omics | **0.8552** | 0.0082 | ✅ CONVERGED |
+| 30% missing | **0.7810** | 0.0138 | ✅ CONVERGED |
+
+---
+
+*Generated: 2025-12-31*
