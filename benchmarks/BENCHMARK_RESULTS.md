@@ -14,6 +14,7 @@
 - **Burnin**: 200
 - **Method**: BayesC (both layers)
 - **Activation**: linear
+- **Constraint**: `true` (default) - independent variances per trait, parallelizable
 
 ---
 
@@ -82,27 +83,36 @@ julia --project=. benchmarks/benchmark_missing_omics.jl
 
 ### Speed (1000 iterations, 3534 individuals, 927 SNPs, 10 omics)
 
-| Metric | Value |
-|--------|-------|
-| Total time | ~38s |
-| Iterations/sec | **26 iter/s** |
+| Threads | Time (s) | Iterations/sec | Speedup |
+|---------|----------|----------------|---------|
+| 1 (single) | ~277s | **3.6** | 1.0x |
+| 10 (multi) | ~128s | **7.8** | 2.2x |
+
+*Note: Multi-threading enabled by default with `constraint=true`*
 
 ### Cross-Package Comparison
 
 | Package | Accuracy (full) | Accuracy (30% missing) | Speed (iter/s) |
 |---------|-----------------|------------------------|----------------|
-| **NNMM.jl** | **0.8552** | **0.7810** | **26** |
+| **NNMM.jl** | **0.8552** | **0.7873** | **3.6 - 7.8** |
 | PyNNMM | 0.8127 | 0.7711 | 9.6 |
-| Parity | 95% | 99% | 37% |
+| Parity | 95% | 98% | varies |
 
 ---
 
-## Convergence Check (5 seeds × 1000 iterations)
+## Convergence Check (5 seeds × 1000 iterations, constraint=true)
 
-| Scenario | Mean Accuracy | Std Dev | Status |
-|----------|---------------|---------|--------|
-| Full omics | **0.8552** | 0.0082 | ✅ CONVERGED |
-| 30% missing | **0.7810** | 0.0138 | ✅ CONVERGED |
+| Seed | genetic_total | genetic_direct | genetic_indirect | Time (s) |
+|------|---------------|----------------|------------------|----------|
+| 42 | 0.8549 | 0.0399 | 0.9358 | 301.6 |
+| 123 | 0.8556 | 0.0411 | 0.9361 | 267.5 |
+| 456 | 0.8547 | 0.0405 | 0.9354 | 380.8 |
+| 789 | 0.8546 | 0.0394 | 0.9358 | 228.4 |
+| 2024 | 0.8563 | 0.0407 | 0.9370 | 226.4 |
+| **Mean** | **0.8552** | **0.0403** | **0.9360** | 281.0 |
+| **Std** | **0.0007** | **0.0007** | **0.0006** | 63.9 |
+
+✅ **CONVERGED**: Very low standard deviation (0.0007) indicates stable results across different seeds.
 
 ---
 
@@ -156,4 +166,4 @@ With the default `constraint=true`, multi-threading can provide speedup proporti
 
 ---
 
-*Generated: 2025-12-31*
+*Generated: 2025-12-31 (Updated: constraint=true benchmark results)*
