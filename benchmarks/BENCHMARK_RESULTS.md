@@ -106,4 +106,55 @@ julia --project=. benchmarks/benchmark_missing_omics.jl
 
 ---
 
+## Multi-Threading
+
+NNMM.jl supports multi-threaded parallelism for the "mega-trait" approach when `constraint=true`.
+
+### Enabling Multi-Threading
+
+```bash
+# Run with 10 threads (one per omics trait)
+julia --project=. -t 10 benchmarks/benchmark_accuracy.jl
+```
+
+### Conditions for Parallel Speedup
+
+Multi-threading provides speedup only when:
+1. `constraint=true` for both residual and marker effect covariances
+2. Each trait can be sampled independently (diagonal covariance)
+
+The default benchmark uses `constraint=false` (full covariance), so multi-threading has no effect on speed.
+
+---
+
+## Gap Analysis (NNMM.jl vs PyNNMM)
+
+### Accuracy Gap: 5% (0.85 vs 0.81)
+
+| Factor | Impact | Description |
+|--------|--------|-------------|
+| RNG differences | Medium | Julia MT19937 vs C++ default_random_engine |
+| Numerical precision | Low | Float32 (Julia) vs Float64 (C++) |
+| Pre-computed matrices | Medium | Julia updates GibbsMats after X2 changes |
+| Posterior mean | Fixed | Both now compute correctly |
+
+### Speed Gap: 2.7x (26 vs 9.6 iter/s)
+
+| Factor | NNMM.jl | PyNNMM | Impact |
+|--------|---------|--------|--------|
+| Compiler | Julia JIT (LLVM) | Clang -O3 | High |
+| BLAS | OpenBLAS (native) | Disabled (Rosetta) | High |
+| Memory layout | Column-major | Row-major | Medium |
+| Pre-computed matrices | GibbsMats cached | Computed on-fly | Medium |
+| Architecture | Native arm64 | x86_64 (Rosetta 2) | High |
+
+### Recommendations for PyNNMM
+
+1. **Use native arm64 Python** - Eliminates Rosetta 2 overhead
+2. **Enable OpenBLAS** - After switching to arm64
+3. **Add OpenMP parallelism** - For mega-trait mode
+4. **Cache column extractions** - Pre-compute like GibbsMats
+
+---
+
 *Generated: 2025-12-31*
