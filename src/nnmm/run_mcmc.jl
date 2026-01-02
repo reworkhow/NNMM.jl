@@ -96,7 +96,7 @@ function runNNMM(layers, equations;
                             estimate_variance = estimate_variance_G, estimate_scale = estimate_scale_G,
                             constraint = constraint_G, #for multi-trait only, constraint=true means no genetic covariance among traits
                             ## format:
-                            separator = separator, header = header, double_precision = false,
+                            separator = separator, header = header, double_precision = double_precision,
                             ## quality control:
                             quality_control = quality_control, MAF = MAF, missing_value = missing_value,
                             ## others:
@@ -398,7 +398,13 @@ function runNNMM(layers, equations;
     
     #print equations
     printstyled(" - Model equation 1->2:\n", bold=false, color=:green)
-    for eq in split(equation_12, ';')
+    eqs_12 = split(equation_12, ';')
+    max_eqs = 5
+    for (idx, eq) in enumerate(eqs_12)
+        if idx > max_eqs
+            printstyled("    ... ($(length(eqs_12) - max_eqs) more equations)\n", bold=false, color=:green)
+            break
+        end
         printstyled("    $eq\n", bold=false, color=:green)
     end
 
@@ -418,7 +424,12 @@ function runNNMM(layers, equations;
     
     #print equations
     printstyled(" - Model equation 2->3:\n", bold=false, color=:green)
-    for eq in split(equation_23, ';')
+    eqs_23 = split(equation_23, ';')
+    for (idx, eq) in enumerate(eqs_23)
+        if idx > max_eqs
+            printstyled("    ... ($(length(eqs_23) - max_eqs) more equations)\n", bold=false, color=:green)
+            break
+        end
         printstyled("    $eq\n", bold=false, color=:green)
     end
 
@@ -851,9 +862,28 @@ function runNNMM(layers, equations;
         for mme in mme_all
             if mme.M != 0
                 for Mi in mme.M
-                    Mi.genotypes = map(Float64,Mi.genotypes)
-                    Mi.G.val         = map(Float64,Mi.G.val)
-                    Mi.α         = map(Float64,Mi.α)
+                    if typeof(Mi) == Genotypes
+                        Mi.genotypes = map(Float64, Mi.genotypes)
+                    elseif typeof(Mi) == Omics
+                        if !(Mi.data isa DataFrame)
+                            Mi.data = map(Float64, Mi.data)
+                        end
+                        if Mi.aligned_omics_w_phenotype != false
+                            if !(Mi.aligned_omics_w_phenotype isa DataFrame)
+                                Mi.aligned_omics_w_phenotype = map(Float64, Mi.aligned_omics_w_phenotype)
+                            end
+                        end
+                    end
+                    Mi.G.val = map(Float64, Mi.G.val)
+                    if Mi.α != false
+                        if Mi.α isa DataFrame
+                            Mi.α = Matrix{Float64}(Mi.α)
+                        elseif Mi.α isa AbstractVector && !isempty(Mi.α) && Mi.α[1] isa AbstractVector
+                            Mi.α = [Float64.(v) for v in Mi.α]
+                        else
+                            Mi.α = map(Float64, Mi.α)
+                        end
+                    end
                 end
             end
             for random_term in mme.rndTrmVec

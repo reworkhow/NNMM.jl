@@ -243,9 +243,21 @@ function set_marker_hyperparameters_variances_and_pi(mme::MME)
                         error("Marker effects covariance matrix is not postive definite! Please modify the argument: Pi.")
                       end
                       println("The prior for marker effects covariance matrix is calculated from genetic covariance matrix and Π.")
-                      println("The mean of the prior for the marker effects covariance matrix is:")
                       if mme.MCMCinfo.printout_model_info==true
-                          Base.print_matrix(stdout,round.(Mi.G.val,digits=6))
+                          if Mi.G.constraint == true
+                              # For constraint=true (independent traits), print only diagonal values
+                              println("The mean of the prior for the marker effects variance (diagonal):")
+                              max_traits = 5
+                              for t in 1:min(Mi.ntraits, max_traits)
+                                  @printf("  trait %d: %.6f\n", t, Mi.G.val[t,t])
+                              end
+                              if Mi.ntraits > max_traits
+                                  println("  ... (", Mi.ntraits - max_traits, " more traits)")
+                              end
+                          else
+                              println("The mean of the prior for the marker effects covariance matrix is:")
+                              print_matrix_truncated(Mi.G.val; digits=6)
+                          end
                       end
                     else
                       if !isposdef(Mi.G.val) #positive scalar (>0)

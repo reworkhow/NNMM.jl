@@ -191,7 +191,8 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
     if mme2.M != 0
         for Mi in mme2.M
             #Mi.α  (starting values were set in get_genotypes)
-            Mi_genotypes = convert(Matrix{Float32}, Mi.aligned_omics_w_phenotype)
+            Mi_genotypes = convert(mme2.MCMCinfo.double_precision ? Matrix{Float64} : Matrix{Float32},
+                                   Mi.aligned_omics_w_phenotype)
             mGibbs    = GibbsMats(Mi_genotypes,invweights2)
             Mi.mArray,Mi.mRinvArray,Mi.mpRinvm  = mGibbs.xArray,mGibbs.xRinvArray,mGibbs.xpRinvx
 
@@ -484,7 +485,8 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         if sum(incomplete_omics) != 0   #at least 1 ind with incomplete omics
             if mme1.is_activation_fcn == true #Neural Network with activation function
                 #step 1. sample latent trait (only for individuals with incomplete omics data
-                Z  = map(Float32,mkmat_incidence_factor(mme2.obsID,mme2.M[1].obsID))
+                Z  = map(mme1.MCMCinfo.double_precision ? Float64 : Float32,
+                         mkmat_incidence_factor(mme2.obsID,mme2.M[1].obsID))
                 ylats_new = hmc_one_iteration(10,0.1,ylats_old[incomplete_omics,:],yobs[incomplete_omics],mme1.weights_NN,mme1.R.val,σ2_yobs,ycorr_reshape[incomplete_omics,:],nonlinear_function,ycorr2[BitVector(Z*incomplete_omics),:])
             else  #user-defined function, MH
                 candidates       = μ_ylats+randn(size(μ_ylats))  #candidate samples
@@ -536,7 +538,8 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
             end
         end
         #update Mi.mArray, Mi.mRinvArray, Mi.mpRinvx for 2->3
-        Mi_genotypes = convert(Matrix{Float32}, mme2.M[1].aligned_omics_w_phenotype)
+        Mi_genotypes = convert(mme2.MCMCinfo.double_precision ? Matrix{Float64} : Matrix{Float32},
+                               mme2.M[1].aligned_omics_w_phenotype)
         mGibbs    = GibbsMats(Mi_genotypes,invweights2)
         mme2.M[1].mArray, mme2.M[1].mRinvArray, mme2.M[1].mpRinvm  = mGibbs.xArray, mGibbs.xRinvArray, mGibbs.xpRinvx
 
@@ -747,7 +750,19 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         ########################################################################
         if iter%mme1.MCMCinfo.printout_frequency==0 && iter>burnin
             println("\nPosterior means at iteration: ",iter)
-            println("Residual variance: ",round.(mme1.meanVare,digits=6))
+            # Print residual variance in a clean format
+            if mme1.R.constraint == true && mme1.nModels > 1
+                println("Residual variance (diagonal):")
+                max_traits = 5
+                for t in 1:min(mme1.nModels, max_traits)
+                    @printf("  trait %d: %.6f\n", t, mme1.meanVare[t,t])
+                end
+                if mme1.nModels > max_traits
+                    println("  ... (", mme1.nModels - max_traits, " more traits)")
+                end
+            else
+                println("Residual variance: ",round.(mme1.meanVare,digits=6))
+            end
         end
     end
 

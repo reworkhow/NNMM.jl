@@ -42,7 +42,9 @@ function errors_args(mme)
                     error("SSGBLUP is not available")
                 end
             end
-            if mme.nModels > 1 && Mi.π != 0.0
+            # For constraint=true (independent traits), Pi is handled per-trait, not as a dictionary
+            # Only validate dictionary format for constraint=false multi-trait models
+            if mme.nModels > 1 && Mi.π != 0.0 && Mi.G.constraint == false
                 if round(sum(values(Mi.π)),digits=2)!=1.0
                   error("Summation of probabilities of Pi is not equal to one.")
                 end
@@ -438,6 +440,16 @@ function init_mixed_model_equations(mme,df,starting_value)
     #nsol = size(mme.mmeLhs,1)+sum((Mi.method != "GBLUP" ? Mi.nMarkers : Mi.nObs) for Mi in mme.M)*mme.nModels
     if starting_value == false #no starting values
         mme.sol = zeros((mme.MCMCinfo.double_precision ? Float64 : Float32),nsol)
+        # Initialize intercepts to trait means for faster chain alignment
+        for trm in mme.modelTerms
+            if !isempty(trm.factors) && trm.factors[1] == :intercept
+                trait_sym = Symbol(trm.iTrait)
+                if trait_sym in names(df)
+                    mean_val = mean(filter(isfinite, skipmissing(df[!, trait_sym])))
+                    mme.sol[trm.startPos] = mme.MCMCinfo.double_precision ? Float64(mean_val) : Float32(mean_val)
+                end
+            end
+        end
     else            #besure type is Float64
         printstyled("Starting values are provided. The order of starting values for location parameters\n",
         "should be the order of location parameters in the Mixed Model Equation for all traits (This can be\n",

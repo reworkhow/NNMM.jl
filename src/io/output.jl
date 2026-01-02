@@ -373,14 +373,30 @@ function output_MCMC_samples_setup(mme,nIter,output_samples_frequency,file_name=
       end
   end
 
+  max_file_messages = 5
+  files_shown = 0
+  files_hidden = 0
   for i in outvar
       file_i    = file_name*"_"*replace(i,":"=>".")*".txt" #replace ":" by "." to avoid reserved characters in Windows
       if isfile(file_i)
-        printstyled("The file "*file_i*" already exists!!! It is overwritten by the new output.\n",bold=false,color=:red)
+        if files_shown < max_file_messages
+          printstyled("The file "*file_i*" already exists!!! It is overwritten by the new output.\n",bold=false,color=:red)
+          files_shown += 1
+        else
+          files_hidden += 1
+        end
       else
-        printstyled("The file "*file_i*" is created to save MCMC samples for "*i*".\n",bold=false,color=:green)
+        if files_shown < max_file_messages
+          printstyled("The file "*file_i*" is created to save MCMC samples for "*i*".\n",bold=false,color=:green)
+          files_shown += 1
+        else
+          files_hidden += 1
+        end
       end
       outfile[i]=open(file_i,"w")
+  end
+  if files_hidden > 0
+      printstyled("... ($files_hidden more output files created)\n",bold=false,color=:green)
   end
 
   #add headers

@@ -13,6 +13,23 @@ using ForwardDiff
 
 import StatsBase: describe  # a new describe is exported
 
+"""
+    print_matrix_truncated(mat, max_size=5)
+
+* (internal function) Print a matrix, truncating if larger than max_size.
+"""
+function print_matrix_truncated(mat; max_size=5, digits=3)
+    n = size(mat, 1)
+    if n <= max_size
+        Base.print_matrix(stdout, round.(mat, digits=digits))
+    else
+        # Show first max_size rows and columns
+        Base.print_matrix(stdout, round.(mat[1:max_size, 1:max_size], digits=digits))
+        println("\n  ... (showing $(max_size)×$(max_size) of $(n)×$(n) matrix)")
+    end
+    println()
+end
+
 # Pedigree Module (loaded first as other modules depend on it)
 include("pedigree/PedModule.jl")
 using .PedModule
@@ -407,8 +424,13 @@ function describe(model::MME;data=false)
       solve(model,data)
     end
     printstyled("\nA Linear Mixed Model was build using model equations:\n\n",bold=true)
-    for i in model.modelVec
-        println(i)
+    max_eqs = 5
+    for (idx, eq) in enumerate(model.modelVec)
+        if idx > max_eqs
+            println("... (", length(model.modelVec) - max_eqs, " more equations)")
+            break
+        end
+        println(eq)
     end
     println()
     printstyled("Model Information:\n\n",bold=true)
@@ -487,10 +509,19 @@ function getMCMCinfo(mme)
         thisterm= join(i.term_array, ",")
         if mme.nModels == 1
             @printf("%-30s %20s\n","random effect variances ("*thisterm*"):",Float64.(round.(inv(i.GiNew.val),digits=3)))
+        elseif i.Gi.constraint == true && mme.nModels > 1
+            # FIX: For constraint=true, print only diagonal values
+            @printf("%-30s\n","random effect variances ("*thisterm*", diagonal):")
+            var_matrix = inv(i.GiNew.val)
+            for t in 1:min(mme.nModels, 5)
+                @printf("  trait %d: %.4f\n", t, var_matrix[t,t])
+            end
+            if mme.nModels > 5
+                println("  ... (", mme.nModels - 5, " more traits)")
+            end
         else
             @printf("%-30s\n","random effect variances ("*thisterm*"):")
-            Base.print_matrix(stdout,round.(inv(i.GiNew.val),digits=3))
-            println()
+            print_matrix_truncated(inv(i.GiNew.val))
         end
     end
     if mme.pedTrmVec!=0
@@ -498,15 +529,22 @@ function getMCMCinfo(mme)
     end
     if mme.pedTrmVec!=0
         @printf("%-30s\n","genetic variances (polygenic):")
-        Base.print_matrix(stdout,round.(inv(mme.rndTrmVec[polygenic_pos].Gi.val),digits=3))
-        println()
+        print_matrix_truncated(inv(mme.rndTrmVec[polygenic_pos].Gi.val))
     end
     if mme.nModels == 1
         @printf("%-30s %20.3f\n","residual variances:", mme.R.val)
+    elseif mme.R.constraint == true && mme.nModels > 1
+        # FIX: For constraint=true, print only diagonal values
+        @printf("%-30s\n","residual variances (diagonal):")
+        for t in 1:min(mme.nModels, 5)
+            @printf("  trait %d: %.4f\n", t, mme.R.val[t,t])
+        end
+        if mme.nModels > 5
+            println("  ... (", mme.nModels - 5, " more traits)")
+        end
     else
         @printf("%-30s\n","residual variances:")
-        Base.print_matrix(stdout,round.(mme.R.val,digits=3))
-        println()
+        print_matrix_truncated(mme.R.val)
     end
 
     printstyled("\nGenomic Information:\n\n",bold=true)
@@ -517,43 +555,88 @@ function getMCMCinfo(mme)
             println()
             @printf("%-30s %20s\n","Genomic Category", Mi.name)
             @printf("%-30s %20s\n","Method",Mi.method)
-            for Mi in mme.M
-                if Mi.genetic_variance.val != false
-                    if (mme.nModels == 1 || is_nnbayes_partial) && mme.MCMCinfo.RRM == false
-                        @printf("%-30s %20.3f\n","genetic variances (genomic):",Mi.genetic_variance.val)
-                    else
-                        @printf("%-30s\n","genetic variances (genomic):")
-                        Base.print_matrix(stdout,round.(Mi.genetic_variance.val,digits=3))
-                        println()
+            # FIX: Removed nested loop (was: for Mi in mme.M) that caused N² repeated output
+            if Mi.genetic_variance.val != false
+                if (mme.nModels == 1 || is_nnbayes_partial) && mme.MCMCinfo.RRM == false
+                    @printf("%-30s %20.3f\n","genetic variances (genomic):",Mi.genetic_variance.val)
+                elseif Mi.G.constraint == true && mme.nModels > 1
+                    # FIX: For constraint=true (independent traits), print only diagonal values
+                    @printf("%-30s\n","genetic variances (genomic, diagonal):")
+                    for t in 1:min(mme.nModels, 5)  # Show first 5 traits max
+                        @printf("  trait %d: %.4f\n", t, Mi.genetic_variance.val[t,t])
                     end
-                end
-                if !(Mi.method in ["GBLUP"])
-                    if (mme.nModels == 1 || is_nnbayes_partial) && mme.MCMCinfo.RRM == false
-                        @printf("%-30s %20.3f\n","marker effect variances:",Mi.G.val)
-                    else
-                        @printf("%-30s\n","marker effect variances:")
-                        Base.print_matrix(stdout,round.(Mi.G.val,digits=3))
-                        println()
+                    if mme.nModels > 5
+                        println("  ... (", mme.nModels - 5, " more traits)")
                     end
+                else
+                    @printf("%-30s\n","genetic variances (genomic):")
+                    print_matrix_truncated(Mi.genetic_variance.val)
                 end
-                if !(Mi.method in ["RR-BLUP","BayesL","GBLUP"])
-                    if mme.nModels == 1 && mme.MCMCinfo.RRM == false
-                        @printf("%-30s %20s\n","π",Mi.π)
-                    else
-                        println("\nΠ: (Y(yes):included; N(no):excluded)\n")
-                        print(string.(mme.lhsVec))
-                        @printf("%20s\n","probability")
-                        for (i,j) in Mi.π
-                            i = replace(string.(i),"1.0"=>"Y","0.0"=>"N")
-                            print(i)
-                            @printf("%20s\n",j)
-                        end
-                        println()
-                    end
-                    @printf("%-30s %20s\n","estimatePi",Mi.estimatePi ? "true" : "false")
-                end
-                @printf("%-30s %20s\n","estimate_scale",Mi.G.estimate_scale ? "true" : "false")
             end
+            if !(Mi.method in ["GBLUP"])
+                if (mme.nModels == 1 || is_nnbayes_partial) && mme.MCMCinfo.RRM == false
+                    @printf("%-30s %20.3f\n","marker effect variances:",Mi.G.val)
+                elseif Mi.G.constraint == true && mme.nModels > 1
+                    # FIX: For constraint=true (independent traits), print only diagonal values
+                    @printf("%-30s\n","marker effect variances (diagonal):")
+                    for t in 1:min(mme.nModels, 5)  # Show first 5 traits max
+                        @printf("  trait %d: %.4f\n", t, Mi.G.val[t,t])
+                    end
+                    if mme.nModels > 5
+                        println("  ... (", mme.nModels - 5, " more traits)")
+                    end
+                else
+                    @printf("%-30s\n","marker effect variances:")
+                    print_matrix_truncated(Mi.G.val)
+                end
+            end
+            if !(Mi.method in ["RR-BLUP","BayesL","GBLUP"])
+                if mme.nModels == 1 && mme.MCMCinfo.RRM == false
+                    @printf("%-30s %20s\n","π",Mi.π)
+                elseif Mi.G.constraint == true && mme.nModels > 1
+                    # FIX: For constraint=true, π is sampled independently per trait during MCMC
+                    # At this point (before MCMC), π may still be in dictionary format
+                    # Just print a simple message instead of the full dictionary
+                    if Mi.π isa AbstractVector
+                        @printf("%-30s\n","π (per trait, independent):")
+                        for t in 1:min(mme.nModels, 5)  # Show first 5 traits max
+                            @printf("  trait %d: %.4f\n", t, Mi.π[t])
+                        end
+                        if mme.nModels > 5
+                            println("  ... (", mme.nModels - 5, " more traits)")
+                        end
+                    else
+                        # constraint=true but π not yet converted to vector (before MCMC)
+                        # Extract initial π value from the dictionary (all values are the same)
+                        initial_pi = first(values(Mi.π))
+                        @printf("%-30s\n","π (per trait, independent):")
+                        if Mi.estimatePi
+                            @printf("  prior value: %.4f (will be sampled per-trait)\n", initial_pi)
+                        else
+                            @printf("  fixed value: %.4f (not sampled)\n", initial_pi)
+                        end
+                    end
+                else
+                    # Full multi-trait with covariance: π is a dictionary with 2^ntraits combinations
+                    println("\nΠ: (Y(yes):included; N(no):excluded)\n")
+                    print(string.(mme.lhsVec))
+                    @printf("%20s\n","probability")
+                    pi_entries = collect(Mi.π)
+                    max_pi_entries = 20  # Truncate if more than 20 entries (2^4 = 16 traits)
+                    for idx in 1:min(length(pi_entries), max_pi_entries)
+                        (i,j) = pi_entries[idx]
+                        i = replace(string.(i),"1.0"=>"Y","0.0"=>"N")
+                        print(i)
+                        @printf("%20s\n",j)
+                    end
+                    if length(pi_entries) > max_pi_entries
+                        println("  ... (", length(pi_entries) - max_pi_entries, " more combinations)")
+                    end
+                    println()
+                end
+                @printf("%-30s %20s\n","estimatePi",Mi.estimatePi ? "true" : "false")
+            end
+            @printf("%-30s %20s\n","estimate_scale",Mi.G.estimate_scale ? "true" : "false")
         end
     end
     printstyled("\nDegree of freedom for hyper-parameters:\n\n",bold=true)
