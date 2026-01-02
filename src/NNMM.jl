@@ -72,24 +72,31 @@ include("gwas/GWAS.jl")
 include("datasets/Datasets.jl")
 using .Datasets: dataset
 
-# Exports - Core functionality (used internally by NNMM)
-export set_covariate, set_random, add_genotypes, get_genotypes
-export outputMCMCsamples, outputEBV, getEBV
-export describe
-export mkmat_incidence_factor
+# =============================================================================
+# Exports - Public API (user-facing)
+# =============================================================================
+# Main NNMM functions
+export Layer, Equation, runNNMM, describe
 
-# Exports - NNMM
-export Layer, Equation, Omics, Phenotypes, read_genotypes, read_omics, read_phenotypes
-export nnmm_build_model, runNNMM
+# Data reading (alternative to Layer constructor)
+export read_genotypes, read_omics, read_phenotypes
 
-# Exports - Pedigree module
-export get_pedigree, get_info
-
-# Exports - GWAS
-export GWAS
-
-# Exports - Datasets
+# Built-in datasets
 export dataset
+
+# Post-analysis
+export GWAS, getEBV
+
+# =============================================================================
+# Exports - Advanced/Internal (may be needed by power users)
+# =============================================================================
+export Omics, Phenotypes                    # Data types (usually not needed directly)
+export set_covariate, set_random            # Model building helpers
+export add_genotypes, get_genotypes         # Genotype management
+export outputMCMCsamples, outputEBV         # Output helpers
+export get_pedigree, get_info               # Pedigree utilities
+export nnmm_build_model                     # Low-level model building
+export mkmat_incidence_factor               # Internal utility
 
 
 ################################################################################
@@ -234,9 +241,9 @@ function getMCMCinfo(mme)
             @printf("%-30s %20s\n","Genomic Category", Mi.name)
             @printf("%-30s %20s\n","Method",Mi.method)
             # FIX: Removed nested loop (was: for Mi in mme.M) that caused N² repeated output
-            if Mi.genetic_variance.val != false
-                if (mme.nModels == 1 || is_nnbayes_partial) && mme.MCMCinfo.RRM == false
-                    @printf("%-30s %20.3f\n","genetic variances (genomic):",Mi.genetic_variance.val)
+                if Mi.genetic_variance.val != false
+                    if (mme.nModels == 1 || is_nnbayes_partial) && mme.MCMCinfo.RRM == false
+                        @printf("%-30s %20.3f\n","genetic variances (genomic):",Mi.genetic_variance.val)
                 elseif Mi.G.constraint == true && mme.nModels > 1
                     # FIX: For constraint=true (independent traits), print only diagonal values
                     @printf("%-30s\n","genetic variances (genomic, diagonal):")
@@ -249,11 +256,11 @@ function getMCMCinfo(mme)
                 else
                     @printf("%-30s\n","genetic variances (genomic):")
                     print_matrix_truncated(Mi.genetic_variance.val)
+                    end
                 end
-            end
-            if !(Mi.method in ["GBLUP"])
-                if (mme.nModels == 1 || is_nnbayes_partial) && mme.MCMCinfo.RRM == false
-                    @printf("%-30s %20.3f\n","marker effect variances:",Mi.G.val)
+                if !(Mi.method in ["GBLUP"])
+                    if (mme.nModels == 1 || is_nnbayes_partial) && mme.MCMCinfo.RRM == false
+                        @printf("%-30s %20.3f\n","marker effect variances:",Mi.G.val)
                 elseif Mi.G.constraint == true && mme.nModels > 1
                     # FIX: For constraint=true (independent traits), print only diagonal values
                     @printf("%-30s\n","marker effect variances (diagonal):")
@@ -266,11 +273,11 @@ function getMCMCinfo(mme)
                 else
                     @printf("%-30s\n","marker effect variances:")
                     print_matrix_truncated(Mi.G.val)
+                    end
                 end
-            end
-            if !(Mi.method in ["RR-BLUP","BayesL","GBLUP"])
-                if mme.nModels == 1 && mme.MCMCinfo.RRM == false
-                    @printf("%-30s %20s\n","π",Mi.π)
+                if !(Mi.method in ["RR-BLUP","BayesL","GBLUP"])
+                    if mme.nModels == 1 && mme.MCMCinfo.RRM == false
+                        @printf("%-30s %20s\n","π",Mi.π)
                 elseif Mi.G.constraint == true && mme.nModels > 1
                     # FIX: For constraint=true, π is sampled independently per trait during MCMC
                     # At this point (before MCMC), π may still be in dictionary format
@@ -296,17 +303,17 @@ function getMCMCinfo(mme)
                     end
                 else
                     # Full multi-trait with covariance: π is a dictionary with 2^ntraits combinations
-                    println("\nΠ: (Y(yes):included; N(no):excluded)\n")
-                    print(string.(mme.lhsVec))
-                    @printf("%20s\n","probability")
+                        println("\nΠ: (Y(yes):included; N(no):excluded)\n")
+                        print(string.(mme.lhsVec))
+                        @printf("%20s\n","probability")
                     pi_entries = collect(Mi.π)
                     max_pi_entries = 20  # Truncate if more than 20 entries (2^4 = 16 traits)
                     for idx in 1:min(length(pi_entries), max_pi_entries)
                         (i,j) = pi_entries[idx]
-                        i = replace(string.(i),"1.0"=>"Y","0.0"=>"N")
-                        print(i)
-                        @printf("%20s\n",j)
-                    end
+                            i = replace(string.(i),"1.0"=>"Y","0.0"=>"N")
+                            print(i)
+                            @printf("%20s\n",j)
+                        end
                     if length(pi_entries) > max_pi_entries
                         println("  ... (", length(pi_entries) - max_pi_entries, " more combinations)")
                     end
