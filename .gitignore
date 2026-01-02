@@ -32,6 +32,11 @@ dev_workspace/
 # Log files
 *.log
 
+# Benchmark output files (CSV results, timing files)
+benchmarks/*.csv
+benchmarks/*.txt
+benchmarks/results/
+
 # Coverage
 lcov.info
 *.cov
