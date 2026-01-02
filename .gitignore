@@ -26,6 +26,12 @@ test/fixtures/
 IDs_for_individuals_with_*.txt
 nnmm_results*/
 
+# Development workspace (temporary data, outputs, results)
+dev_workspace/
+
+# Log files
+*.log
+
 # Coverage
 lcov.info
 *.cov
