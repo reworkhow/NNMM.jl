@@ -1,5 +1,55 @@
 __precompile__(true)
 
+"""
+    NNMM
+
+Neural Network Mixed Model for genomic prediction with intermediate omics data.
+
+# Overview
+NNMM implements a two-layer neural network framework for genomic prediction:
+
+    Layer 1 (Genotypes) → Layer 2 (Omics/Latent) → Layer 3 (Phenotypes)
+
+The model uses Bayesian methods (BayesA, BayesB, BayesC, RR-BLUP, BayesL, GBLUP)
+for marker effect estimation and HMC/Metropolis-Hastings for sampling latent traits.
+
+# Quick Start
+```julia
+using NNMM
+
+# Define network layers
+layer1 = Layer(layer_name="geno",  data_path="genotypes.csv")
+layer2 = Layer(layer_name="omics", data_path="omics.csv")
+layer3 = Layer(layer_name="pheno", data_path="phenotypes.csv")
+
+# Define equations
+eq1 = Equation("omics = intercept + geno", 
+               method="BayesC", omics_name=["o1","o2"])
+eq2 = Equation("pheno = intercept + omics",
+               activation_function=tanh, phenotype_name=["y"])
+
+# Run MCMC
+results = runNNMM([layer1, layer2, layer3], [eq1, eq2],
+                  chain_length=10000, burnin=2000)
+```
+
+# Main Types
+- `Layer`: Network layer specification
+- `Equation`: Model equation with Bayesian method selection
+
+# Main Functions
+- `runNNMM`: Run NNMM analysis
+- `describe`: Print model information
+- `GWAS`: Genome-wide association study on results
+- `getEBV`: Extract estimated breeding values
+
+# References
+- NNMM methodology paper (forthcoming)
+- JWAS.jl: Julia package for whole-genome analyses
+
+Author: NNMM.jl Team
+License: MIT
+"""
 module NNMM
 
 using Distributions, Printf, Random
@@ -99,13 +149,38 @@ export nnmm_build_model                     # Low-level model building
 export mkmat_incidence_factor               # Internal utility
 
 
-################################################################################
-# Print out Model or MCMC information
-################################################################################
+# =============================================================================
+# Model Description Functions
+# =============================================================================
+
 """
     describe(model::MME)
 
-* Print out model information.
+Print a summary of the mixed model equations (MME) structure.
+
+Displays:
+- Model equations (truncated if >5)
+- Term information (classification, fixed/random, number of levels)
+- Prior distributions and hyperparameters
+- Variance component settings
+- Marker effect settings (if genomic data included)
+
+# Arguments
+- `model::MME`: The mixed model equations object (created internally by runNNMM)
+
+# Output
+Prints formatted model summary to stdout including:
+- Model equations
+- Term classification (covariate/factor, fixed/random)
+- Prior settings for variance components
+- MCMC configuration
+
+# Example
+```julia
+# After running runNNMM, the describe function is called automatically.
+# For manual inspection:
+describe(results["mme"])
+```
 """
 function describe(model::MME)
     printstyled("\nA Linear Mixed Model was build using model equations:\n\n",bold=true)

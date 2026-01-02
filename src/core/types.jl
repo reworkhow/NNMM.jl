@@ -1,3 +1,26 @@
+#=
+================================================================================
+Core Type Definitions for Mixed Model Equations
+================================================================================
+Fundamental data structures for building and solving mixed models.
+
+Types defined here:
+- ModelTerm: Individual term in a model equation
+- Variance: Variance/covariance parameter container
+- ResVar: Residual variance structure (multi-trait)
+- RandomEffect: Random effect specification
+- Genotypes: Genotype data and marker effect parameters
+- MME: Mixed Model Equations container
+- MCMCinfo: MCMC sampler configuration
+
+These types are used internally by NNMM.jl for model construction
+and MCMC sampling. Most users will interact with these through
+the higher-level `Layer` and `Equation` types.
+
+Author: NNMM.jl Team (adapted from JWAS.jl)
+================================================================================
+=#
+
 """
     ModelTerm
 

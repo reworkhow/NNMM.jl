@@ -140,3 +140,4 @@ println("\n12. SCALE PARAMETERS (Layer 2)")
 println("   scale2 (omics effect): $(round(scale2, digits=6))")
 println("   scale_vare2 (residual): $(round(scale_vare2, digits=6))")
 
+

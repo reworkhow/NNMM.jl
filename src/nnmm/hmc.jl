@@ -1,32 +1,39 @@
-#tianjing: modified from non-linear.jl
-#sample all hidden nodes together
+#=
+================================================================================
+Hamiltonian Monte Carlo (HMC) Sampler for Latent Traits
+================================================================================
+Samples missing/latent omics values in the NNMM framework using HMC.
 
-#                 |---- Z[:,1] ----- Z0*W0[:,1]
-#yobs ---f(X)----|---- Z[:,2] ----- Z0*W0[:,2]
-#                 |---- Z[:,3] ----- Z0*W0[:,3]
-#
-# in total 1 hidden layers, with l1 nodes.
+Network Architecture:
+                   |---- Z[:,1] ----- Z0*W0[:,1]
+    yobs ---f(X)---|---- Z[:,2] ----- Z0*W0[:,2]
+                   |---- Z[:,3] ----- Z0*W0[:,3]
 
-###########
-# X: marker covariate matrix, n by p, each col is for 1 marker
-# Z: latent traits, n by l1 matrix, each col is for 1 latent trait
-# y: observed trait, vector of n by 1
-###########
+    Where f(X) is the activation function (tanh, sigmoid, etc.)
 
-###########
-# W0: marker effects, matrix of p by l1, each col is for a latent trait
-# W1: weights from hidden layer to observed trait, vector of l1 by 1
-###########
+Notation:
+  X  : Marker covariate matrix, n × p (each column = 1 marker)
+  Z  : Latent traits, n × l1 (each column = 1 latent trait)
+  y  : Observed trait, vector of length n
+  W0 : Marker effects, p × l1 (each column = effects for 1 latent trait)
+  W1 : Weights from hidden layer to output, vector of length l1
+  Mu0: Bias terms for latent traits, vector of length l1
+  mu : Bias for observed trait, scalar
+  Sigma2z: Residual variance of latent traits, diagonal l1 × l1
+  sigma2e: Residual variance of observed trait, scalar
 
-###########
-# Mu0: bias of latent traits, vector of length l1
-# mu: bias of observed trait, scaler
-###########
+Key Functions:
+  calc_gradient_z: Compute gradient for HMC proposal
+  calc_log_p_z: Compute log probability for acceptance ratio
+  hmc_one_iteration_z!: Perform one HMC step
 
-###########
-# Sigma2z: residual variance of latent trait, diagonal matrix of size l1*l1
-# sigma2e: residual variance of observed trait, scaler
-###########
+Reference:
+  Neal (2011) MCMC using Hamiltonian dynamics. 
+  Handbook of Markov Chain Monte Carlo.
+
+Author: NNMM.jl Team
+================================================================================
+=#
 
 
 #helper 1: calculate gradiant of all latent traits for all individual

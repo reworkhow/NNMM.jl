@@ -1,7 +1,51 @@
-"""
-    GWAS(marker_effects_file;header=true)
+#=
+================================================================================
+Genome-Wide Association Study (GWAS) Analysis
+================================================================================
+Post-MCMC analysis functions for computing marker associations and
+window-based genetic variance.
 
-Compute the model frequency for each marker (the probability the marker is included in the model) using samples of marker effects stored in **marker_effects_file**.
+Functions:
+- GWAS(marker_effects_file): Compute model frequency per marker
+- GWAS(model, map_file, marker_effects_file): Window-based GWAS
+
+Features:
+- Model frequency (probability marker included)
+- Window-based variance explained
+- Sliding or non-overlapping windows
+- Genetic correlation between traits
+
+Reference:
+  Fernando et al. (2017) A class of Bayesian methods to combine large
+  numbers of genotyped and non-genotyped animals for whole-genome analyses.
+  Genetics Selection Evolution 49:96.
+
+Author: NNMM.jl Team (adapted from JWAS.jl)
+================================================================================
+=#
+
+"""
+    GWAS(marker_effects_file; header=true)
+
+Compute the model frequency for each marker.
+
+Model frequency is the probability that a marker is included in the model
+(i.e., has non-zero effect) across MCMC samples.
+
+# Arguments
+- `marker_effects_file`: Path to CSV file with MCMC samples of marker effects
+- `header`: Whether file has header row (default: true)
+
+# Returns
+DataFrame with columns:
+- `marker_ID`: Marker identifier
+- `modelfrequency`: Proportion of samples where effect ≠ 0
+
+# Example
+```julia
+# After running NNMM with BayesB or BayesC
+freq = GWAS("nnmm_results/MCMC_samples_marker_effects_genotypes.txt")
+```
 """
 function GWAS(marker_effects_file;header=true)
     println("Compute the model frequency for each marker (the probability the marker is included in the model).")

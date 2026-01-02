@@ -1,8 +1,35 @@
-# Reference:
-#Cheng et al. 2018 Genomic prediction from multiple-trait bayesian regression methods using mixture priors. Genetics209:  89–103.
-# Gibbs sampler I: only one of the t indicator lables is sampled at a time.
-# Gibbs sampler II: all indicator labels are sampled jointly, can be used for the restrictive model assuming any particular locus affects all traits or none of them.
+#=
+================================================================================
+Multi-Trait Bayesian Alphabet Samplers (BayesA, BayesB, BayesC)
+================================================================================
+Gibbs samplers for marker effect estimation in multi-trait genomic prediction.
 
+Two sampling strategies:
+- Gibbs Sampler I: One indicator label sampled at a time (flexible model)
+- Gibbs Sampler II: All indicators sampled jointly (restrictive model where
+                    markers affect all traits or none)
+
+Key Functions:
+- MTBayesABC!: Main entry point, dispatches to appropriate sampler
+- MTBayesABC_samplerII!: Joint sampling of all trait indicators
+- MTBayesABC_block!: Block-based sampling for computational efficiency
+
+Reference:
+  Cheng et al. (2018) Genomic prediction from multiple-trait Bayesian 
+  regression methods using mixture priors. Genetics 209:89-103.
+
+Author: NNMM.jl Team (adapted from JWAS.jl)
+================================================================================
+=#
+
+"""
+    MTBayesABC!(genotypes, ycorr_array, vare, locus_effect_variances, nModels)
+
+Multi-trait BayesABC sampler with automatic strategy selection.
+
+Selects between Gibbs Sampler I (flexible) and Gibbs Sampler II (restrictive)
+based on the π dictionary size.
+"""
 function MTBayesABC!(genotypes,ycorr_array,vare,locus_effect_variances,nModels)
     if length(genotypes.π) == 2^nModels  #Gibbs sampler I
         MTBayesABC!(genotypes.mArray,genotypes.mRinvArray,genotypes.mpRinvm,

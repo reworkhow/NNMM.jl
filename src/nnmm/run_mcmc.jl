@@ -1,3 +1,78 @@
+#=
+================================================================================
+NNMM - Neural Network Mixed Model
+================================================================================
+Main entry point for running NNMM analysis.
+
+This file implements the `runNNMM` function which orchestrates:
+1. Data reading (genotypes, omics, phenotypes)
+2. Model building (MME construction for both layers)
+3. MCMC sampling via Bayesian Alphabet methods
+
+Architecture:
+  Layer 1 (Genotypes) → Layer 2 (Omics/Latent) → Layer 3 (Phenotype)
+
+Author: NNMM.jl Team
+================================================================================
+=#
+
+"""
+    runNNMM(layers, equations; kwargs...)
+
+Run Neural Network Mixed Model (NNMM) analysis.
+
+# Arguments
+- `layers`: Vector of 3 `Layer` objects defining the network architecture
+  - Layer 1: Genotypes (SNPs)
+  - Layer 2: Omics/Latent traits
+  - Layer 3: Phenotypes
+- `equations`: Vector of 2 `Equation` objects defining relationships
+  - Equation 1: Genotypes → Omics (1→2)
+  - Equation 2: Omics → Phenotypes (2→3)
+
+# Keyword Arguments
+## MCMC Settings
+- `chain_length::Integer=100`: Total MCMC iterations
+- `burnin::Integer=0`: Number of burn-in iterations to discard
+- `output_samples_frequency::Integer`: Save every nth sample (default: auto)
+- `update_priors_frequency::Integer=0`: Update prior parameters every n iterations
+
+## Output Settings
+- `outputEBV=true`: Output estimated breeding values
+- `output_heritability=true`: Calculate heritability estimates
+- `output_folder="nnmm_results"`: Directory for output files
+
+## Computational Settings
+- `seed=false`: Random seed for reproducibility
+- `double_precision=false`: Use Float64 instead of Float32
+- `big_memory=false`: Enable memory-intensive optimizations
+
+# Returns
+A dictionary containing:
+- Posterior means for all parameters
+- MCMC samples (saved to files)
+- EBV estimates
+
+# Example
+```julia
+# Define layers
+layer1 = Layer(name="geno", file="genotypes.csv")
+layer2 = Layer(name="omics", file="omics.csv")
+layer3 = Layer(name="pheno", file="phenotypes.csv")
+
+# Define equations
+eq1 = Equation("omics = intercept + geno", 
+               method="BayesC", omics_name=["o1","o2"])
+eq2 = Equation("pheno = intercept + omics", 
+               activation_function=tanh, phenotype_name=["y"])
+
+# Run analysis
+results = runNNMM([layer1, layer2, layer3], [eq1, eq2],
+                  chain_length=5000, burnin=1000)
+```
+
+See also: [`Layer`](@ref), [`Equation`](@ref), [`describe`](@ref)
+"""
 function runNNMM(layers, equations;
                 #MCMC
                 chain_length::Integer             = 100,

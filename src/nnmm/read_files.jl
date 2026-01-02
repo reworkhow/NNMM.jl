@@ -1,3 +1,50 @@
+#=
+================================================================================
+Data Reading Functions for NNMM
+================================================================================
+Functions for reading genotype, omics, and phenotype data files.
+
+Functions:
+- nnmm_get_genotypes: Read genotype data from file/matrix
+- nnmm_get_omics: Read omics data from file/matrix
+- read_phenotypes: Read phenotype data from file
+
+Supported formats:
+- CSV files (with configurable delimiter)
+- DataFrames
+- Numeric matrices
+
+Author: NNMM.jl Team
+================================================================================
+=#
+
+"""
+    nnmm_get_genotypes(file, G=false; kwargs...)
+
+Read genotype data for the NNMM model (layer 1).
+
+# Arguments
+- `file`: Genotype data source - can be:
+  - `String`: Path to CSV file
+  - `DataFrame`: DataFrame with ID column + marker columns
+  - `Matrix`: Numeric matrix of genotypes
+- `G`: Prior genetic variance (default: estimated from data)
+
+# Keyword Arguments
+- `method`: Bayesian method ("BayesA", "BayesB", "BayesC", "RR-BLUP", "GBLUP", "BayesL")
+- `Pi`: Prior inclusion probability (default: 0.0)
+- `estimatePi`: Whether to estimate Pi (default: true)
+- `G_is_marker_variance`: If true, G is marker variance; if false, G is genetic variance
+- `df`: Degrees of freedom for prior (default: 4.0)
+- `quality_control`: Perform QC filtering (default: true)
+- `MAF`: Minor allele frequency threshold (default: 0.01)
+- `center`: Center genotypes (default: true)
+- `separator`: File delimiter (default: ',')
+- `header`: File has header row (default: true)
+
+# Returns
+`Genotypes` struct containing processed genotype data and method parameters.
+"""
 function nnmm_get_genotypes(file::Union{AbstractString,Array{Float64,2},Array{Float32,2},Array{Int64,2}, Array{Int32,2}, Array{Any,2}, DataFrames.DataFrame}, G = false;
                        ## method:
                        method = "BayesC", Pi = 0.0, estimatePi = true, 

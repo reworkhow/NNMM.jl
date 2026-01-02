@@ -1,6 +1,46 @@
-################################################################################
-#MCMC for RR-BLUP, GBLUP, BayesABC, and conventional (no markers) methods
-################################################################################
+#=
+================================================================================
+MCMC Sampler for NNMM - Bayesian Alphabet Methods
+================================================================================
+Implements the main MCMC loop for the Neural Network Mixed Model.
+
+Supports: RR-BLUP, GBLUP, BayesA, BayesB, BayesC, BayesL
+
+The sampler alternates between:
+  1. Layer 1→2: Sample marker effects (genotypes → omics)
+  2. Layer 2→3: Sample omics effects (omics → phenotypes)
+  3. Sample latent/missing omics values via HMC or Metropolis-Hastings
+
+Key Variables:
+  - mme1: Mixed Model Equations for layer 1→2
+  - mme2: Mixed Model Equations for layer 2→3
+  - ycorr1: Residuals for layer 1→2
+  - ycorr2: Residuals for layer 2→3
+
+Author: NNMM.jl Team
+================================================================================
+=#
+
+"""
+    nnmm_MCMC_BayesianAlphabet(mme1, df1, mme2, df2)
+
+Internal function: Run the MCMC sampler for NNMM.
+
+This is called by `runNNMM` after model setup is complete.
+
+# Arguments
+- `mme1`: MME object for genotypes → omics layer
+- `df1`: DataFrame containing omics data
+- `mme2`: MME object for omics → phenotypes layer  
+- `df2`: DataFrame containing phenotype data
+
+# Returns
+Dictionary with posterior results including:
+- Location parameters
+- Variance components
+- Marker effects
+- EBV estimates
+"""
 function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
     
     #1->2:

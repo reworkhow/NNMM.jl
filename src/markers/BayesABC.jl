@@ -1,3 +1,34 @@
+#=
+================================================================================
+Single-Trait Bayesian Alphabet Samplers (BayesA, BayesB, BayesC)
+================================================================================
+Gibbs samplers for marker effect estimation in single-trait genomic prediction.
+
+Methods:
+- BayesA: All markers included with locus-specific variances
+- BayesB: Variable selection with locus-specific variances
+- BayesC: Variable selection with common variance
+
+Key Functions:
+- megaBayesABC!: Multi-threaded sampler for independent traits (constraint=true)
+- BayesABC!: Core single-trait Gibbs sampler
+
+Reference:
+  Meuwissen et al. (2001) Prediction of total genetic value using 
+  genome-wide dense marker maps. Genetics 157:1819-1829.
+
+Author: NNMM.jl Team (adapted from JWAS.jl)
+================================================================================
+=#
+
+"""
+    megaBayesABC!(genotypes, wArray, vare, locus_effect_variances)
+
+Multi-threaded BayesABC sampler for independent traits.
+
+Used when `constraint=true` (diagonal covariance), allowing parallel
+sampling across traits.
+"""
 function megaBayesABC!(genotypes,wArray,vare,locus_effect_variances)
     Threads.@threads for i in 1:length(wArray) #ntraits
          BayesABC!(genotypes.mArray,genotypes.mRinvArray,genotypes.mpRinvm,

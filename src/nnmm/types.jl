@@ -1,3 +1,19 @@
+#=
+================================================================================
+NNMM Type Definitions
+================================================================================
+Core data structures for the Neural Network Mixed Model.
+
+Types defined here:
+- Layer: Network layer specification (genotypes, omics, phenotypes)
+- Equation: Model equation specification
+- Omics: Omics/intermediate trait data container
+- Phenotypes: Phenotype data container
+
+Author: NNMM.jl Team
+================================================================================
+=#
+
 """
     Layer
 
