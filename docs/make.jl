@@ -4,8 +4,15 @@ makedocs(
     modules = [NNMM, NNMM.Datasets, NNMM.PedModule],
     doctest = false,
     clean = true,
+    checkdocs = :exports,
     sitename = "NNMM.jl",
     authors = "Hao Cheng, Tianjing Zhao, Rohan Fernando, Dorian Garrick and contributors.",
+    format = Documenter.HTML(
+        prettyurls = get(ENV, "CI", nothing) == "true",
+        canonical = "https://reworkhow.github.io/NNMM.jl/stable/",
+        assets = String[],
+        sidebar_sitename = true,
+    ),
     pages = Any[
         "Home" => "index.md",
         "Mixed Effects Neural Networks (NNMM)" => Any[
@@ -27,4 +34,6 @@ makedocs(
 deploydocs(
     repo = "github.com/reworkhow/NNMM.jl.git",
     target = "build",
+    devbranch = "master",
+    push_preview = true,
 )
