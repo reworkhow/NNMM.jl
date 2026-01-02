@@ -71,7 +71,8 @@ equations = [
         equation="phenotypes = intercept + omics",
         phenotype_name=["trait1"],
         method="BayesC",
-        activation_function="linear"
+        activation_function="linear",
+        estimate_variance_G=false  # Disable variance estimation to prevent scale explosion
     )
 ]
 
