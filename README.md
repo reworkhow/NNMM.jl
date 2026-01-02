@@ -2,11 +2,12 @@
 
 [![CI](https://github.com/reworkhow/NNMM.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/reworkhow/NNMM.jl/actions/workflows/CI.yml)
 [![codecov](https://codecov.io/gh/reworkhow/NNMM.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/reworkhow/NNMM.jl)
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://reworkhow.github.io/NNMM.jl/stable)
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://reworkhow.github.io/NNMM.jl/dev)
 
 **NNMM.jl** is an open-source Julia package for **Neural Network Mixed Models** that extend traditional linear mixed models to multilayer neural networks for genomic prediction and genome-wide association studies.
 
-* **Documentation**: [https://reworkhow.github.io/NNMM.jl/dev](https://reworkhow.github.io/NNMM.jl/dev)
+* **Documentation**: [https://reworkhow.github.io/NNMM.jl/stable](https://reworkhow.github.io/NNMM.jl/stable)
 * **Authors**: [Hao Cheng](https://qtl.rocks), [Tianjing Zhao](https://animalscience.unl.edu/person/tianjing-zhao/)
 
 ## Key Features
