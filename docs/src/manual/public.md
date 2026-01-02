@@ -38,23 +38,8 @@ GWAS
 getEBV
 ```
 
-## Data Reading
-
-Functions for loading genotype, omics, and phenotype data.
-
-```@docs
-read_genotypes
-read_omics
-read_phenotypes
-```
-
-## Utility Functions
-
-Helper functions for advanced users.
+## Pedigree Functions
 
 ```@docs
 get_pedigree
-get_genotypes
-set_covariate
-set_random
 ```

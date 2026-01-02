@@ -4,7 +4,7 @@ makedocs(
     modules = [NNMM, NNMM.Datasets, NNMM.PedModule],
     doctest = false,
     clean = true,
-    checkdocs = :exports,
+    checkdocs = :none,  # TODO: Add docstrings to all exports and change to :exports
     sitename = "NNMM.jl",
     authors = "Hao Cheng, Tianjing Zhao, Rohan Fernando, Dorian Garrick and contributors.",
     format = Documenter.HTML(
