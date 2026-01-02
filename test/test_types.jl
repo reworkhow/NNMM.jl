@@ -69,21 +69,6 @@ using NNMM
     end
 end
 
-@testset "build_model function" begin
-    # Test single-trait model building
-    model_eq = "y1 = intercept + age + sex"
-    R = 1.0
-    model = NNMM.build_model(model_eq, R)
-    @test model.nModels == 1
-    @test :y1 in model.lhsVec
-
-    # Test multi-trait model building
-    model_eq_mt = "y1 = intercept + age
-                   y2 = intercept + age"
-    R_mt = [1.0 0.5; 0.5 1.0]
-    model_mt = NNMM.build_model(model_eq_mt, R_mt)
-    @test model_mt.nModels == 2
-    @test :y1 in model_mt.lhsVec
-    @test :y2 in model_mt.lhsVec
-end
+# Note: build_model was a legacy JWAS function that has been removed.
+# NNMM uses runNNMM() which handles model building internally.
 
