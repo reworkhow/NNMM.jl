@@ -206,11 +206,50 @@ function nnmm_get_genotypes(file::Union{AbstractString,Array{Float64,2},Array{Fl
     return genotypes
 end
 
+"""
+    get_genotypes(args...; kwargs...)
+
+Alias for [`nnmm_get_genotypes`](@ref). See that function for full documentation.
+"""
 get_genotypes(args...; kwargs...) = nnmm_get_genotypes(args...; kwargs...)
 
 
+"""
+    nnmm_get_omics(file, G=false; kwargs...)
 
-# copied from nnmm_get_genotypes
+Read omics data for the NNMM model (layer 2 / middle layer).
+
+# Arguments
+- `file`: Path to CSV file containing omics data
+- `G`: Prior genetic variance (default: estimated from data)
+
+# Keyword Arguments
+- `omics_name`: Vector of column names to use as omics features (required)
+- `method`: Bayesian method ("BayesA", "BayesB", "BayesC", "RR-BLUP", "BayesL")
+- `Pi`: Prior inclusion probability (default: 0.0)
+- `estimatePi`: Whether to estimate Pi (default: true)
+- `G_is_marker_variance`: If true, G is marker variance; if false, G is genetic variance
+- `df`: Degrees of freedom for prior (default: 4.0)
+- `constraint`: Use independent variances for multi-trait (default: true)
+- `separator`: File delimiter (default: ',')
+- `header`: File has header row (default: true)
+- `missing_value`: String/value representing missing data (default: false)
+
+# Returns
+`Omics` struct containing the omics data and method parameters.
+
+# Example
+```julia
+omics = nnmm_get_omics("omics_data.csv", 
+                       omics_name=["gene1", "gene2", "gene3"],
+                       missing_value="NA")
+```
+
+# Notes
+- First column must be individual IDs
+- Missing values will be sampled during MCMC (HMC for latent traits)
+- Unlike genotypes, no quality control (MAF filtering) is applied
+"""
 function nnmm_get_omics(file::AbstractString, G = false;
                        ## omics name:
                        omics_name = false,
@@ -289,6 +328,33 @@ end
 
 
 
+"""
+    read_phenotypes(file; separator=',', header=true, missing_value="NA", output_folder=".")
+
+Read phenotype data from a CSV file.
+
+# Arguments
+- `file`: Path to CSV file containing phenotype data
+
+# Keyword Arguments
+- `separator`: Column delimiter (default: ',')
+- `header`: Whether file has header row (default: true)
+- `missing_value`: String representing missing values (default: "NA")
+- `output_folder`: Directory for output files (default: current directory)
+
+# Returns
+`DataFrame` with phenotype data. First column is individual IDs.
+
+# Example
+```julia
+pheno_df = read_phenotypes("phenotypes.csv", missing_value="NA")
+```
+
+# Notes
+- First column must contain individual IDs
+- Missing values are converted to Julia's `missing` type
+- A file `IDs_for_individuals_with_phenotypes.txt` is written to output_folder
+"""
 function read_phenotypes(file::AbstractString;
                        ## format:
                        separator = ',', header = true, missing_value = "NA",

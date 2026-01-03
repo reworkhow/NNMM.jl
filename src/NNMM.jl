@@ -128,8 +128,10 @@ using .Datasets: dataset
 # Main NNMM functions
 export Layer, Equation, runNNMM, describe
 
-# Data reading (alternative to Layer constructor)
-export read_genotypes, read_omics, read_phenotypes
+# Data reading functions
+export read_phenotypes                      # Read phenotype data from file
+export nnmm_get_genotypes, get_genotypes    # Read genotype data (get_genotypes is alias)
+export nnmm_get_omics                       # Read omics data
 
 # Built-in datasets
 export dataset
@@ -142,10 +144,8 @@ export GWAS, getEBV
 # =============================================================================
 export Omics, Phenotypes                    # Data types (usually not needed directly)
 export set_covariate, set_random            # Model building helpers
-export add_genotypes, get_genotypes         # Genotype management
 export outputMCMCsamples, outputEBV         # Output helpers
 export get_pedigree, get_info               # Pedigree utilities
-export nnmm_build_model                     # Low-level model building
 export mkmat_incidence_factor               # Internal utility
 
 
@@ -328,8 +328,8 @@ function getMCMCinfo(mme)
                     if mme.nModels > 5
                         println("  ... (", mme.nModels - 5, " more traits)")
                     end
-                else
-                    @printf("%-30s\n","genetic variances (genomic):")
+                    else
+                        @printf("%-30s\n","genetic variances (genomic):")
                     print_matrix_truncated(Mi.genetic_variance.val)
                     end
                 end
@@ -345,8 +345,8 @@ function getMCMCinfo(mme)
                     if mme.nModels > 5
                         println("  ... (", mme.nModels - 5, " more traits)")
                     end
-                else
-                    @printf("%-30s\n","marker effect variances:")
+                    else
+                        @printf("%-30s\n","marker effect variances:")
                     print_matrix_truncated(Mi.G.val)
                     end
                 end

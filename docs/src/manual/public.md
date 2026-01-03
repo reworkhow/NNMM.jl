@@ -29,6 +29,17 @@ runNNMM
 describe
 ```
 
+## Data Reading Functions
+
+Functions for reading input data files.
+
+```@docs
+nnmm_get_genotypes
+get_genotypes
+nnmm_get_omics
+read_phenotypes
+```
+
 ## Post-Analysis
 
 Functions for analyzing MCMC results.
@@ -36,6 +47,12 @@ Functions for analyzing MCMC results.
 ```@docs
 GWAS
 getEBV
+```
+
+## Built-in Datasets
+
+```@docs
+NNMM.Datasets.dataset
 ```
 
 ## Pedigree Functions

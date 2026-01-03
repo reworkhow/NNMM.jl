@@ -25,6 +25,7 @@ makedocs(
         ],
         "Manual" => Any[
             "Get Started" => "manual/getstarted.md",
+            "Tutorial" => "manual/tutorial.md",
             "Public Functions" => "manual/public.md",
         ],
         "Citing" => "citing/citing.md",
