@@ -5,6 +5,9 @@ using NNMM
     # Core type tests
     include("test_types.jl")
     
+    # Utility function tests
+    include("test_utilities.jl")
+    
     # Pedigree module tests
     include("test_pedigree.jl")
     
@@ -28,4 +31,10 @@ using NNMM
     
     # NNMM as traditional BayesC (missing middle layer pattern)
     include("test_nnmm_as_bayesc.jl")
+    
+    # Additional Bayesian methods (BayesB, BayesL, RR-BLUP)
+    include("test_more_methods.jl")
+    
+    # Post-analysis functions (GWAS, getEBV)
+    include("test_post_analysis.jl")
 end
