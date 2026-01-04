@@ -58,6 +58,10 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
     is_activation_fcn        = mme1.is_activation_fcn
     nonlinear_function       = mme1.nonlinear_function
     causal_structure         = false
+    debug_scale              = get(ENV, "NNMM_DEBUG_SCALE", "0") == "1"
+    debug_scale_iters_str    = get(ENV, "NNMM_DEBUG_SCALE_ITERS", "5")
+    debug_scale_iters_parsed = tryparse(Int, debug_scale_iters_str)
+    debug_scale_iters        = debug_scale_iters_parsed === nothing ? 5 : debug_scale_iters_parsed
 
     ############################################################################
     # Working Variables
@@ -285,17 +289,15 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         end
     end
 
-    #phenotypes corrected for all effects
-    ycorr2 = vec(Matrix(mme2.ySparse)-mme2.X*mme2.sol) #length of ycorr2 is #individuals with non-missing yobs
+    # phenotypes corrected for all effects (2->3)
+    # NOTE: ycorr2 must always be y - X*b - Σ(Z_i * α_i) before calling BayesABC!,
+    # otherwise α will drift (double-counting the previous iteration's effects).
+    ycorr2 = vec(Matrix(mme2.ySparse) - mme2.X * mme2.sol) #length of ycorr2 is #individuals with non-missing yobs
     if mme2.M != 0
         for Mi in mme2.M
-            Mi_genotypes = mme2.M[1].aligned_omics_w_phenotype
-            for traiti in 1:Mi.ntraits
-                if Mi.α[traiti] != zero(Mi.α[traiti])  
-                    ycorr2[(traiti-1)*Mi.aligned_nObs_w_phenotype+1 : traiti*Mi.aligned_nObs_w_phenotype] = ycorr2[(traiti-1)*Mi.aligned_nObs_w_phenotype+1 : traiti*Mi.aligned_nObs_w_phenotype]
-                                                                 - Mi_genotypes*Mi.α[traiti]
-                end
-            end
+            Xomics = Mi.aligned_omics_w_phenotype
+            # MT 2->3 is not supported for now, so Mi.ntraits is expected to be 1
+            ycorr2 .-= Xomics * Mi.α[1]
         end
     end
 
@@ -564,17 +566,12 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         mme2.M[1].data[!,mme2.M[1].featureID] = ylats_old
         #update aligned transformed omics data (g(z))
         align_transformed_omics_with_phenotypes(mme2,nonlinear_function)
-        #update ycorr2 
-        ycorr2[:] = vec(Matrix(mme2.ySparse)-mme2.X*mme2.sol)
+        #update ycorr2 (2->3): y - X*b - Σ(Z_i * α_i)
+        ycorr2[:] = vec(Matrix(mme2.ySparse) - mme2.X * mme2.sol)
         if mme2.M != 0
             for Mi in mme2.M
-                Mi_genotypes = mme2.M[1].aligned_omics_w_phenotype
-                for traiti in 1:Mi.ntraits
-                    if Mi.α[traiti] != zero(Mi.α[traiti])  
-                        ycorr2[(traiti-1)*Mi.aligned_nObs_w_phenotype+1 : traiti*Mi.aligned_nObs_w_phenotype] = ycorr2[(traiti-1)*Mi.aligned_nObs_w_phenotype+1 : traiti*Mi.aligned_nObs_w_phenotype]
-                                                                    - Mi_genotypes*Mi.α[traiti]
-                    end
-                end
+                Xomics = Mi.aligned_omics_w_phenotype
+                ycorr2 .-= Xomics * Mi.α[1]
             end
         end
         #update Mi.mArray, Mi.mRinvArray, Mi.mpRinvx for 2->3
@@ -582,6 +579,15 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
                                mme2.M[1].aligned_omics_w_phenotype)
         mGibbs    = GibbsMats(Mi_genotypes,invweights2)
         mme2.M[1].mArray, mme2.M[1].mRinvArray, mme2.M[1].mpRinvm  = mGibbs.xArray, mGibbs.xRinvArray, mGibbs.xpRinvx
+        if debug_scale && iter <= debug_scale_iters && mme2.M != 0 && length(mme2.M) > 0
+            Mi_dbg = mme2.M[1]
+            X_dbg = Mi_dbg.aligned_omics_w_phenotype
+            α_dbg = Mi_dbg.α[1]
+            println("\n[NNMM_DEBUG_SCALE iter=$(iter)] pre-2->3:")
+            println("  ycorr2: mean=$(mean(ycorr2)) std=$(std(ycorr2)) maxabs=$(maximum(abs.(ycorr2)))")
+            println("  X_dbg col1: mean=$(mean(view(X_dbg,:,1))) std=$(std(view(X_dbg,:,1))) maxabs=$(maximum(abs.(view(X_dbg,:,1))))")
+            println("  α_dbg: std=$(std(α_dbg)) maxabs=$(maximum(abs.(α_dbg)))")
+        end
 
         #2->3
         ########################################################################
@@ -673,6 +679,14 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
                     else
                         GBLUP!(Mi,ycorr2,mme2.R.val,invweights2)
                     end
+                end
+                if debug_scale && iter <= debug_scale_iters
+                    X_dbg = mme2.M[1].aligned_omics_w_phenotype
+                    α_dbg = Mi.α[1]
+                    pred_dbg = X_dbg * α_dbg
+                    println("[NNMM_DEBUG_SCALE iter=$(iter)] post-2->3 marker effects:")
+                    println("  α_dbg: std=$(std(α_dbg)) maxabs=$(maximum(abs.(α_dbg)))")
+                    println("  pred=Xα: mean=$(mean(pred_dbg)) std=$(std(pred_dbg)) maxabs=$(maximum(abs.(pred_dbg)))")
                 end
                 ########################################################################
                 # Marker Inclusion Probability

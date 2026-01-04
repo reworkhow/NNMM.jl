@@ -5,6 +5,8 @@
 *.jl.cov
 *.jl.mem
 Manifest.toml
+.julia_depot/
+.juliaup_depot/
 
 # Build artifacts
 docs/build/
@@ -40,4 +42,3 @@ benchmarks/results/
 # Coverage
 lcov.info
 *.cov
-
