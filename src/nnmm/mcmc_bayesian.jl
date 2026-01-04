@@ -62,6 +62,10 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
     debug_scale_iters_str    = get(ENV, "NNMM_DEBUG_SCALE_ITERS", "5")
     debug_scale_iters_parsed = tryparse(Int, debug_scale_iters_str)
     debug_scale_iters        = debug_scale_iters_parsed === nothing ? 5 : debug_scale_iters_parsed
+    debug_invariants              = get(ENV, "NNMM_DEBUG_INVARIANTS", "0") == "1"
+    debug_invariants_iters_str    = get(ENV, "NNMM_DEBUG_INVARIANTS_ITERS", "5")
+    debug_invariants_iters_parsed = tryparse(Int, debug_invariants_iters_str)
+    debug_invariants_iters        = debug_invariants_iters_parsed === nothing ? 5 : debug_invariants_iters_parsed
 
     ############################################################################
     # Working Variables
@@ -375,9 +379,9 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         ########################################################################
         # 2. Marker Effects
         ########################################################################
-        if mme1.M !=0
-            for i in 1:length(mme1.M)
-                Mi=mme1.M[i]
+	        if mme1.M !=0
+	            for i in 1:length(mme1.M)
+	                Mi=mme1.M[i]
                 ########################################################################
                 # Marker Effects
                 ########################################################################
@@ -427,7 +431,7 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
                             MTGBLUP!(Mi,wArray1,ycorr1,mme1.R.val,invweights1)
                         end
                     elseif is_nnbayes_partial
-                        GBLUP!(Mi,wArray1[i],mme.R.val[i,i],invweights)
+                        GBLUP!(Mi,wArray1[i],mme1.R.val[i,i],invweights1)
                     else
                         GBLUP!(Mi,ycorr1,mme1.R.val,invweights1)
                     end
@@ -464,12 +468,25 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
                         b = sum(Mi.G.df ./ (2*Mi.G.val)) + 1
                         Mi.G.scale = rand(Gamma(a,1/b))
                     end
-                end
-            end
-        end
-        ########################################################################
-        # 3. Non-marker Variance Components
-        ########################################################################
+	                end
+	            end
+	        end
+		        if debug_invariants && iter <= debug_invariants_iters && !is_nnbayes_partial
+		            # Expensive but robust check: recompute residuals from scratch and compare to
+		            # the in-place updated `ycorr1`. Useful to catch silent drift bugs.
+		            ycorr1_check = vec(mme1.ySparse) - mme1.X * mme1.sol
+		            if mme1.M != 0
+		                for Mi in mme1.M
+		                    for traiti in 1:Mi.ntraits
+		                        ycorr1_check[(traiti-1)*Mi.nObs+1 : traiti*Mi.nObs] .-= Mi.genotypes * Mi.α[traiti]
+		                    end
+		                end
+		            end
+		            println("[NNMM_DEBUG_INVARIANTS iter=$(iter)] ycorr1 maxabs(check-current)=$(maximum(abs.(ycorr1_check .- ycorr1)))")
+		        end
+	        ########################################################################
+	        # 3. Non-marker Variance Components
+	        ########################################################################
 
         ########################################################################
         # 3.1 Variance of Non-marker Random Effects
@@ -526,30 +543,43 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         incomplete_omics = mme1.incomplete_omics #indicator for ind with incomplete omics
         if sum(incomplete_omics) != 0   #at least 1 ind with incomplete omics
             if mme1.is_activation_fcn == true #Neural Network with activation function
-                #step 1. sample latent trait (only for individuals with incomplete omics data
-                Z  = map(mme1.MCMCinfo.double_precision ? Float64 : Float32,
-                         mkmat_incidence_factor(mme2.obsID,mme2.M[1].obsID))
-                ylats_new = hmc_one_iteration(10,0.1,ylats_old[incomplete_omics,:],yobs[incomplete_omics],mme1.weights_NN,mme1.R.val,σ2_yobs,ycorr_reshape[incomplete_omics,:],nonlinear_function,ycorr2[BitVector(Z*incomplete_omics),:])
-            else  #user-defined function, MH
-                candidates       = μ_ylats+randn(size(μ_ylats))  #candidate samples
-                if nonlinear_function == "Neural Network (MH)"
-                    error("not supported for now")
-                    μ_yobs_candidate = [ones(nobs) nonlinear_function.(candidates)]*weights
-                    μ_yobs_current   = X*weights
-                else #user-defined non-linear function
-                    μ_yobs_candidate = nonlinear_function.(Tuple([view(candidates,:,i) for i in 1:ntraits])...)
-                    μ_yobs_current   = nonlinear_function.(Tuple([view(ylats_old,:,i) for i in 1:ntraits])...)
-                end
-                llh_current      = -0.5*(yobs - μ_yobs_current ).^2/σ2_yobs
-                llh_candidate    = -0.5*(yobs - μ_yobs_candidate).^2/σ2_yobs
-                mhRatio          = exp.(llh_candidate - llh_current)
-                updateus         = rand(nobs) .< mhRatio
-                ylats_new        = candidates.*updateus + ylats_old.*(.!updateus)
-            end
+	                #step 1. sample latent trait (only for individuals with incomplete omics data
+	                Z  = map(mme1.MCMCinfo.double_precision ? Float64 : Float32,
+	                         mkmat_incidence_factor(mme2.obsID,mme2.M[1].obsID))
+	                ylats_new = hmc_one_iteration(10,0.1,ylats_old[incomplete_omics,:],yobs[incomplete_omics],mme1.weights_NN,mme1.R.val,σ2_yobs,ycorr_reshape[incomplete_omics,:],nonlinear_function,ycorr2[BitVector(Z*incomplete_omics)])
+	            else  #user-defined function, MH
+	                # Independent MH proposal for only the individuals with incomplete omics.
+	                # We propose from the (layer 1->2) conditional normal model and accept/reject
+	                # using only the phenotype likelihood term.
+	                ylats_old_inc = ylats_old[incomplete_omics,:]
+	                μ_ylats_inc   = μ_ylats[incomplete_omics,:]
+	                yobs_inc      = yobs[incomplete_omics]
+	                ninc          = size(ylats_old_inc, 1)
 
-            #step 2. update ylats with sampled latent traits
-            ylats_old[incomplete_omics,:] = ylats_new
-        end
+	                if mme1.R.val isa Number
+	                    candidates = μ_ylats_inc .+ randn(ninc, ntraits) .* sqrt(mme1.R.val)
+	                else
+	                    L = cholesky(Symmetric(mme1.R.val)).L
+	                    candidates = μ_ylats_inc .+ randn(ninc, ntraits) * L'
+	                end
+	                if nonlinear_function == "Neural Network (MH)"
+	                    error("not supported for now")
+	                    μ_yobs_candidate = [ones(nobs) nonlinear_function.(candidates)]*weights
+	                    μ_yobs_current   = X*weights
+	                else #user-defined non-linear function
+	                    μ_yobs_candidate = nonlinear_function.(Tuple([view(candidates,:,i) for i in 1:ntraits])...)
+	                    μ_yobs_current   = nonlinear_function.(Tuple([view(ylats_old_inc,:,i) for i in 1:ntraits])...)
+	                end
+	                llh_current      = -0.5*(yobs_inc .- μ_yobs_current ).^2/σ2_yobs
+	                llh_candidate    = -0.5*(yobs_inc .- μ_yobs_candidate).^2/σ2_yobs
+	                mhRatio          = exp.(llh_candidate - llh_current)
+	                updateus         = rand(ninc) .< mhRatio
+	                ylats_new        = candidates.*updateus + ylats_old_inc.*(.!updateus)
+	            end
+
+	            #step 2. update ylats with sampled latent traits
+	            ylats_old[incomplete_omics,:] = ylats_new
+	        end
         
         #step 3. for individuals with partial omics data, put back the partial real omics.
         ylats_old[mme1.missingPattern] .= ylats_old2[mme1.missingPattern]
@@ -623,9 +653,9 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         ########################################################################
         # 2. Marker Effects
         ########################################################################
-        if mme2.M !=0
-            for i in 1:length(mme2.M)
-                Mi=mme2.M[i]
+	        if mme2.M !=0
+	            for i in 1:length(mme2.M)
+	                Mi=mme2.M[i]
                 ########################################################################
                 # Marker Effects
                 ########################################################################
@@ -715,17 +745,27 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
                 # Scale Parameter in Priors for Marker Effect Variances
                 ########################################################################
                 if Mi.G.estimate_scale == true
-                    if !is_multi_trait1
+                    if !is_multi_trait2
                         a = size(Mi.G.val,1)*Mi.G.df/2   + 1
                         b = sum(Mi.G.df ./ (2*Mi.G.val)) + 1
                         Mi.G.scale = rand(Gamma(a,1/b))
                     end
-                end
-            end
-        end
-        ########################################################################
-        # 3. Non-marker Variance Components
-        ########################################################################
+	                end
+	            end
+	        end
+	        if debug_invariants && iter <= debug_invariants_iters
+	            ycorr2_check = vec(mme2.ySparse) - mme2.X * mme2.sol
+	            if mme2.M != 0
+	                for Mi in mme2.M
+	                    Xomics = Mi.aligned_omics_w_phenotype
+	                    ycorr2_check .-= Xomics * Mi.α[1]
+	                end
+	            end
+	            println("[NNMM_DEBUG_INVARIANTS iter=$(iter)] ycorr2 maxabs(check-current)=$(maximum(abs.(ycorr2_check .- ycorr2)))")
+	        end
+	        ########################################################################
+	        # 3. Non-marker Variance Components
+	        ########################################################################
 
         ########################################################################
         # 3.1 Variance of Non-marker Random Effects
@@ -792,7 +832,9 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
             if mme1.nonlinear_function != false && mme2.M != 0 && length(mme2.M) > 0
                 observed_omics = mme2.M[1].aligned_omics_w_phenotype
                 if mme1.is_activation_fcn == true
-                    EPV_NN = mme1.nonlinear_function.(observed_omics) * mme1.weights_NN
+                    # `aligned_omics_w_phenotype` is already activation-transformed (see align_transformed_omics_with_phenotypes),
+                    # so do NOT apply the activation function a second time.
+                    EPV_NN = observed_omics * mme1.weights_NN
                 else
                     EPV_NN = mme1.nonlinear_function.(Tuple([view(observed_omics,:,i) for i in 1:size(observed_omics,2)])...)
                 end

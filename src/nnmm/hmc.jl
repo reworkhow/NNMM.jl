@@ -42,7 +42,7 @@ function calc_gradient_z(ylats,yobs,weights_NN,σ_ylats,σ_yobs,ycorr,activation
     w1 = weights_NN
     # g_ylats = activation_function.(ylats)
     g_ylats_derivative = ForwardDiff.derivative.(activation_function, ylats)
-    dlogf_ylats    = - ycorr * inv(σ_ylats)
+    dlogf_ylats    = -ycorr / σ_ylats
     # dlogfy         = ((yobs .- μ1 - g_ylats*w1)/σ_yobs) * w1' .* g_ylats_derivative #size: (n, l1)
     dlogfy         = (ycorr_yobs/σ_yobs) * w1' .* g_ylats_derivative #size: (n, l1)
     gradient_ylats = dlogf_ylats + dlogfy
@@ -55,7 +55,9 @@ function calc_log_p_z(ylats,yobs,weights_NN,σ_ylats,σ_yobs,ycorr,activation_fu
     # μ1  = weights_NN[1]
     # w1 = weights_NN[2:end]
     # g_ylats = activation_function.(ylats)
-    logf_ylats = -0.5*sum((ycorr.^2)*inv(σ_ylats),dims=2) .- (0.5*log(prod(diag(σ_ylats))))
+    quad_form = sum((ycorr / σ_ylats) .* ycorr, dims=2)
+    logdet_σ_ylats = σ_ylats isa Number ? log(σ_ylats) : logdet(Symmetric(σ_ylats))
+    logf_ylats = -0.5 .* quad_form .- (0.5 * logdet_σ_ylats)
     # logfy      = -0.5*(yobs .- μ1 - g_ylats*w1).^2 /σ_yobs .- 0.5*log(σ_yobs)
     logfy      = -0.5*(ycorr_yobs).^2 /σ_yobs .- 0.5*log(σ_yobs)
     log_p_ylats= logf_ylats + logfy
