@@ -1,64 +1,190 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Part 3. NNMM with intermediate omics · NNMM.jl</title><meta name="title" content="Part 3. NNMM with intermediate omics · NNMM.jl"/><meta property="og:title" content="Part 3. NNMM with intermediate omics · NNMM.jl"/><meta property="twitter:title" content="Part 3. NNMM with intermediate omics · NNMM.jl"/><meta name="description" content="Documentation for NNMM.jl."/><meta property="og:description" content="Documentation for NNMM.jl."/><meta property="twitter:description" content="Documentation for NNMM.jl."/><meta property="og:url" content="https://reworkhow.github.io/NNMM.jl/stable/nnmm/Part3_NNMMwithIntermediateOmics/"/><meta property="twitter:url" content="https://reworkhow.github.io/NNMM.jl/stable/nnmm/Part3_NNMMwithIntermediateOmics/"/><link rel="canonical" href="https://reworkhow.github.io/NNMM.jl/stable/nnmm/Part3_NNMMwithIntermediateOmics/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.png" alt="NNMM.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">NNMM.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Mixed Effects Neural Networks (NNMM)</span><ul><li><a class="tocitem" href="../Part1_introduction/">Part 1. Introduction</a></li><li><a class="tocitem" href="../Part2_NNMM/">Part 2. NNMM</a></li><li class="is-active"><a class="tocitem" href>Part 3. NNMM with intermediate omics</a><ul class="internal"><li><a class="tocitem" href="#example(o1):-fully-connected-neural-networks-with-observed-intemediate-omics-features"><span>example(o1): fully-connected neural networks with observed intemediate omics features</span></a></li><li><a class="tocitem" href="#Includes-a-residual-that-is-not-mediated-by-other-omics-features"><span>Includes a residual that is not mediated by other omics features</span></a></li><li><a class="tocitem" href="#Output-files"><span>Output files</span></a></li></ul></li><li><a class="tocitem" href="../Part4_PartialConnectedNeuralNetwork/">Part 4. Partial connected neural network</a></li><li><a class="tocitem" href="../Part5_UserDefinedNonlinearFunction/">Part 5. User-defined nonlinear function</a></li><li><a class="tocitem" href="../Part6_TraditionalGenomicPrediction/">Part 6. Traditional genomic prediction</a></li></ul></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../../manual/getstarted/">Get Started</a></li><li><a class="tocitem" href="../../manual/tutorial/">Tutorial</a></li><li><a class="tocitem" href="../../manual/public/">Public Functions</a></li></ul></li><li><a class="tocitem" href="../../citing/citing/">Citing</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Mixed Effects Neural Networks (NNMM)</a></li><li class="is-active"><a href>Part 3. NNMM with intermediate omics</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Part 3. NNMM with intermediate omics</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/reworkhow/NNMM.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/reworkhow/NNMM.jl/blob/master/docs/src/nnmm/Part3_NNMMwithIntermediateOmics.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Mixed-effect-neural-network:-Genotypes-(complete/incomplete)-Intemediate-omics-features-Phenotyes"><a class="docs-heading-anchor" href="#Mixed-effect-neural-network:-Genotypes-(complete/incomplete)-Intemediate-omics-features-Phenotyes">Mixed effect neural network: Genotypes -&gt; (complete/incomplete) Intemediate omics features -&gt; Phenotyes</a><a id="Mixed-effect-neural-network:-Genotypes-(complete/incomplete)-Intemediate-omics-features-Phenotyes-1"></a><a class="docs-heading-anchor-permalink" href="#Mixed-effect-neural-network:-Genotypes-(complete/incomplete)-Intemediate-omics-features-Phenotyes" title="Permalink"></a></h1><p>Tips:</p><ul><li>Put the names of omics features in the <code>build_model()</code> function through the <code>latent_traits</code> argument.</li><li>If there are many omics features (e.g., 1000), it is recommanded to set <code>printout_model_info=false</code> in the <code>runMCMC()</code> function.</li><li>Missing omics data for individuals in the training dataset (i.e., individuals with phenotypes) is allowed. When you read a file with missing values via the <code>CSV.read()</code> function, the <code>missingstrings</code> argument should be used to set sentinel values that will be parsed as <code>missing</code>.</li><li>For individuals in the testing dataset (i.e., individuals without phenotypes), if the testing individuals have complete omics data, then incorporating the omics data of those individuals may improve the relationship between input layer (genotype) and middle layer (omics).</li></ul><h2 id="example(o1):-fully-connected-neural-networks-with-observed-intemediate-omics-features"><a class="docs-heading-anchor" href="#example(o1):-fully-connected-neural-networks-with-observed-intemediate-omics-features">example(o1): fully-connected neural networks with observed intemediate omics features</a><a id="example(o1):-fully-connected-neural-networks-with-observed-intemediate-omics-features-1"></a><a class="docs-heading-anchor-permalink" href="#example(o1):-fully-connected-neural-networks-with-observed-intemediate-omics-features" title="Permalink"></a></h2><ul><li>nonlinear function (to define relationship between omics and phenotye): sigmoid (other supported activation functions: &quot;tanh&quot;, &quot;relu&quot;, &quot;leakyrelu&quot;, &quot;linear&quot;)</li><li>number of omics features in the middle layer: 10</li><li>Bayesian model: multiple independent single-trait BayesC (to sample marker effects on intemediate omics)</li><li>sample the missing omics in the middle layer: Hamiltonian Monte Carlo</li></ul><p><img src="https://github.com/zhaotianjing/figures/blob/main/part3_example.png?raw=true" alt/></p><pre><code class="language-julia hljs"># Step 1: Load packages
-using NNMM,DataFrames,CSV,Statistics,NNMM.Datasets, Random, HTTP #HTTP to download demo data from github
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Part 3. NNMM with intermediate omics · NNMM.jl</title><meta name="title" content="Part 3. NNMM with intermediate omics · NNMM.jl"/><meta property="og:title" content="Part 3. NNMM with intermediate omics · NNMM.jl"/><meta property="twitter:title" content="Part 3. NNMM with intermediate omics · NNMM.jl"/><meta name="description" content="Documentation for NNMM.jl."/><meta property="og:description" content="Documentation for NNMM.jl."/><meta property="twitter:description" content="Documentation for NNMM.jl."/><meta property="og:url" content="https://reworkhow.github.io/NNMM.jl/stable/nnmm/Part3_NNMMwithIntermediateOmics/"/><meta property="twitter:url" content="https://reworkhow.github.io/NNMM.jl/stable/nnmm/Part3_NNMMwithIntermediateOmics/"/><link rel="canonical" href="https://reworkhow.github.io/NNMM.jl/stable/nnmm/Part3_NNMMwithIntermediateOmics/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.png" alt="NNMM.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">NNMM.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Mixed Effects Neural Networks (NNMM)</span><ul><li><a class="tocitem" href="../Part1_introduction/">Part 1. Introduction</a></li><li><a class="tocitem" href="../Part2_NNMM/">Part 2. NNMM</a></li><li class="is-active"><a class="tocitem" href>Part 3. NNMM with intermediate omics</a><ul class="internal"><li><a class="tocitem" href="#Model-Architecture"><span>Model Architecture</span></a></li><li><a class="tocitem" href="#Example:-Fully-Connected-Network-with-Observed-Omics"><span>Example: Fully-Connected Network with Observed Omics</span></a></li><li><a class="tocitem" href="#Including-Residual-Polygenic-Effects"><span>Including Residual Polygenic Effects</span></a></li><li><a class="tocitem" href="#Handling-Missing-Omics-Data"><span>Handling Missing Omics Data</span></a></li><li><a class="tocitem" href="#Output-Files"><span>Output Files</span></a></li><li><a class="tocitem" href="#Tips"><span>Tips</span></a></li></ul></li><li><a class="tocitem" href="../Part4_PartialConnectedNeuralNetwork/">Part 4. Partial connected neural network</a></li><li><a class="tocitem" href="../Part5_UserDefinedNonlinearFunction/">Part 5. User-defined nonlinear function</a></li><li><a class="tocitem" href="../Part6_TraditionalGenomicPrediction/">Part 6. Traditional genomic prediction</a></li></ul></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../../manual/getstarted/">Get Started</a></li><li><a class="tocitem" href="../../manual/tutorial/">Tutorial</a></li><li><a class="tocitem" href="../../manual/public/">Public Functions</a></li></ul></li><li><a class="tocitem" href="../../citing/citing/">Citing</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Mixed Effects Neural Networks (NNMM)</a></li><li class="is-active"><a href>Part 3. NNMM with intermediate omics</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Part 3. NNMM with intermediate omics</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/reworkhow/NNMM.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/reworkhow/NNMM.jl/blob/master/docs/src/nnmm/Part3_NNMMwithIntermediateOmics.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Part-3:-NNMM-with-Intermediate-Omics-Features"><a class="docs-heading-anchor" href="#Part-3:-NNMM-with-Intermediate-Omics-Features">Part 3: NNMM with Intermediate Omics Features</a><a id="Part-3:-NNMM-with-Intermediate-Omics-Features-1"></a><a class="docs-heading-anchor-permalink" href="#Part-3:-NNMM-with-Intermediate-Omics-Features" title="Permalink"></a></h1><div class="admonition is-info" id="Version-Compatibility-bf993f2e71754d5a"><header class="admonition-header">Version Compatibility<a class="admonition-anchor" href="#Version-Compatibility-bf993f2e71754d5a" title="Permalink"></a></header><div class="admonition-body"><p>This documentation reflects <strong>NNMM.jl v0.3+</strong> using the <code>Layer</code>/<code>Equation</code>/<code>runNNMM</code> API.</p></div></div><h2 id="Model-Architecture"><a class="docs-heading-anchor" href="#Model-Architecture">Model Architecture</a><a id="Model-Architecture-1"></a><a class="docs-heading-anchor-permalink" href="#Model-Architecture" title="Permalink"></a></h2><p>When you have observed intermediate omics data (e.g., gene expression, metabolomics), NNMM can incorporate them in the middle layer:</p><pre><code class="nohighlight hljs">Genotypes → (Complete/Incomplete) Intermediate Omics → Phenotypes
+ (Layer 1)              (Layer 2)                       (Layer 3)</code></pre><div class="admonition is-success" id="Key-Points-cf489ce86df6bcfa"><header class="admonition-header">Key Points<a class="admonition-anchor" href="#Key-Points-cf489ce86df6bcfa" title="Permalink"></a></header><div class="admonition-body"><ul><li>Omics feature names are specified in the <code>omics_name</code> parameter of the first <code>Equation</code></li><li>Missing omics values are allowed and will be sampled via HMC</li><li>Testing individuals (without phenotypes) can still contribute omics data to improve the genotype→omics model</li></ul></div></div><h2 id="Example:-Fully-Connected-Network-with-Observed-Omics"><a class="docs-heading-anchor" href="#Example:-Fully-Connected-Network-with-Observed-Omics">Example: Fully-Connected Network with Observed Omics</a><a id="Example:-Fully-Connected-Network-with-Observed-Omics-1"></a><a class="docs-heading-anchor-permalink" href="#Example:-Fully-Connected-Network-with-Observed-Omics" title="Permalink"></a></h2><p>This example demonstrates:</p><ul><li><strong>Activation function</strong>: <code>sigmoid</code> (other options: <code>&quot;tanh&quot;</code>, <code>&quot;relu&quot;</code>, <code>&quot;leakyrelu&quot;</code>, <code>&quot;linear&quot;</code>)</li><li><strong>Number of omics features</strong>: 10</li><li><strong>Bayesian model</strong>: BayesC for marker effects</li><li><strong>Missing omics handling</strong>: Hamiltonian Monte Carlo</li></ul><p><img src="https://github.com/zhaotianjing/figures/blob/main/part3_example.png?raw=true" alt/></p><pre><code class="language-julia hljs"># Step 1: Load packages
+using NNMM
+using NNMM.Datasets
+using DataFrames
+using CSV
+using Statistics
+using Random
+
 Random.seed!(123)
 
-# Step 2: Read data (from github)
-phenofile  = HTTP.get(&quot;https://raw.githubusercontent.com/zhaotianjing/nnmm_doc/main/data_simulation/y.csv&quot;).body
-omicsfile  = HTTP.get(&quot;https://raw.githubusercontent.com/zhaotianjing/nnmm_doc/main/data_simulation/omics.csv&quot;).body
-genofile   = HTTP.get(&quot;https://raw.githubusercontent.com/zhaotianjing/nnmm_doc/main/data_simulation/geno_n100_p200.csv&quot;).body
-phenotypes = CSV.read(phenofile,DataFrame)
-omics      = CSV.read(omicsfile,DataFrame)
-geno_df    = CSV.read(genofile,DataFrame)
+# Step 2: Load simulated dataset
+geno_path = Datasets.dataset(&quot;genotypes_1000snps.txt&quot;, dataset_name=&quot;simulated_omics_data&quot;)
+pheno_path = Datasets.dataset(&quot;phenotypes_sim.txt&quot;, dataset_name=&quot;simulated_omics_data&quot;)
 
-omics_names = names(omics)[2:end]  #get names of omics
-insertcols!(omics,2,:y =&gt; phenotypes[:,:y], :bv =&gt; phenotypes[:,:bv]) #phenotype and omics should be in the same dataframe
+# Read data
+pheno_df = CSV.read(pheno_path, DataFrame)
 
-genotypes = get_genotypes(geno_df,separator=&#39;,&#39;,method=&quot;BayesC&quot;)
+# Step 3: Prepare omics file (Layer 2)
+# Select ID and 10 omics features
+omics_cols = vcat(:ID, [Symbol(&quot;omic$i&quot;) for i in 1:10])
+omics_df = pheno_df[:, omics_cols]
+omics_names = names(omics_df)[2:end]  # [&quot;omic1&quot;, &quot;omic2&quot;, ..., &quot;omic10&quot;]
 
-# Step 3: Build Model Equations
-model_equation  =&quot;y = intercept + genotypes&quot; #name of phenotypes is &quot;y&quot;
-                                             #name of genotypes is &quot;genotypes&quot; (user-defined in the previous step)
-                                             #the single-trait mixed model used between input and each omics is: omics = intercept + genotypes
-model = build_model(model_equation,
-		    num_hidden_nodes=10,          #number of omics in middle layer is 3
-                    latent_traits=omics_names,    #name of all omics
-		    nonlinear_function=&quot;sigmoid&quot;) #sigmoid function is used to approximate relationship between omics and phenotypes
+omics_file = &quot;omics_data.csv&quot;
+CSV.write(omics_file, omics_df; missingstring=&quot;NA&quot;)
 
-# Step 4: Run Analysis
-out=runMCMC(model, omics, chain_length=5000, printout_model_info=false);
+# Step 4: Prepare phenotype file (Layer 3)
+trait_df = pheno_df[:, [:ID, :trait1]]
+trait_file = &quot;phenotypes_data.csv&quot;
+CSV.write(trait_file, trait_df; missingstring=&quot;NA&quot;)
 
-# Step 5: Check Accuruacy
-results    = innerjoin(out[&quot;EBV_NonLinear&quot;], omics, on = :ID)
-accuruacy  = cor(results[!,:EBV],results[!,:bv])</code></pre><h2 id="Includes-a-residual-that-is-not-mediated-by-other-omics-features"><a class="docs-heading-anchor" href="#Includes-a-residual-that-is-not-mediated-by-other-omics-features">Includes a residual that is not mediated by other omics features</a><a id="Includes-a-residual-that-is-not-mediated-by-other-omics-features-1"></a><a class="docs-heading-anchor-permalink" href="#Includes-a-residual-that-is-not-mediated-by-other-omics-features" title="Permalink"></a></h2><p>To include residuals polygenic component (i.e. directly from genotypes to phenotypes, not mediated by omics features), you can additional hidden nodes in the middle layer (see example (o2)). This can also be achieved in a partial-connected neural network in a same manner.</p><p><img src="https://github.com/zhaotianjing/figures/blob/main/wiki_omics_residual.png?raw=true" alt/></p><h3 id="example(o2):-fully-connected-neural-network-with-residuals"><a class="docs-heading-anchor" href="#example(o2):-fully-connected-neural-network-with-residuals">example(o2): fully-connected neural network with residuals</a><a id="example(o2):-fully-connected-neural-network-with-residuals-1"></a><a class="docs-heading-anchor-permalink" href="#example(o2):-fully-connected-neural-network-with-residuals" title="Permalink"></a></h3><p>For all individuals, this extra hidden node will be treated as unknown to be sampled.</p><pre><code class="language-julia hljs"># Step 1: Load packages
-using NNMM,DataFrames,CSV,Statistics,NNMM.Datasets, Random, HTTP 
+# Step 5: Define layers
+layers = [
+    # Layer 1: Genotypes
+    Layer(
+        layer_name = &quot;genotypes&quot;,
+        data_path = [geno_path]
+    ),
+    # Layer 2: Omics (with observed values)
+    Layer(
+        layer_name = &quot;omics&quot;,
+        data_path = omics_file,
+        missing_value = &quot;NA&quot;
+    ),
+    # Layer 3: Phenotypes
+    Layer(
+        layer_name = &quot;phenotypes&quot;,
+        data_path = trait_file,
+        missing_value = &quot;NA&quot;
+    )
+]
+
+# Step 6: Define equations
+equations = [
+    # Genotypes → Omics (BayesC)
+    Equation(
+        from_layer_name = &quot;genotypes&quot;,
+        to_layer_name = &quot;omics&quot;,
+        equation = &quot;omics = intercept + genotypes&quot;,
+        omics_name = omics_names,  # Names of omics columns
+        method = &quot;BayesC&quot;,
+        estimatePi = true
+    ),
+    # Omics → Phenotypes (sigmoid activation)
+    Equation(
+        from_layer_name = &quot;omics&quot;,
+        to_layer_name = &quot;phenotypes&quot;,
+        equation = &quot;phenotypes = intercept + omics&quot;,
+        phenotype_name = [&quot;trait1&quot;],
+        method = &quot;BayesC&quot;,
+        activation_function = &quot;sigmoid&quot;
+    )
+]
+
+# Step 7: Run analysis
+out = runNNMM(layers, equations;
+    chain_length = 5000,
+    burnin = 1000,
+    printout_frequency = 2000,  # Print every 2000 iterations
+    output_folder = &quot;nnmm_omics_results&quot;
+)
+
+# Step 8: Check accuracy
+ebv = out[&quot;EBV_NonLinear&quot;]
+
+# Convert ID types for joining (EBV IDs may be of type Any)
+ebv.ID = string.(ebv.ID)
+pheno_df.ID = string.(pheno_df.ID)
+
+# If true breeding values available:
+if hasproperty(pheno_df, :genetic_total)
+    results = innerjoin(ebv, pheno_df[:, [:ID, :genetic_total]], on=:ID)
+    accuracy = cor(Float64.(results.EBV), results.genetic_total)
+    println(&quot;Prediction accuracy: &quot;, round(accuracy, digits=4))
+end
+
+# Cleanup
+rm(omics_file, force=true)
+rm(trait_file, force=true)</code></pre><h2 id="Including-Residual-Polygenic-Effects"><a class="docs-heading-anchor" href="#Including-Residual-Polygenic-Effects">Including Residual Polygenic Effects</a><a id="Including-Residual-Polygenic-Effects-1"></a><a class="docs-heading-anchor-permalink" href="#Including-Residual-Polygenic-Effects" title="Permalink"></a></h2><p>To include a residual polygenic component (genetic effects not mediated by omics), add an extra latent node to the middle layer:</p><p><img src="https://github.com/zhaotianjing/figures/blob/main/wiki_omics_residual.png?raw=true" alt/></p><h3 id="Example:-Network-with-Residual-Polygenic-Effect"><a class="docs-heading-anchor" href="#Example:-Network-with-Residual-Polygenic-Effect">Example: Network with Residual Polygenic Effect</a><a id="Example:-Network-with-Residual-Polygenic-Effect-1"></a><a class="docs-heading-anchor-permalink" href="#Example:-Network-with-Residual-Polygenic-Effect" title="Permalink"></a></h3><pre><code class="language-julia hljs"># Step 1: Load packages
+using NNMM
+using NNMM.Datasets
+using DataFrames
+using CSV
+using Statistics
+using Random
+
 Random.seed!(123)
 
-# Step 2: Read data (from github)
-phenofile  = HTTP.get(&quot;https://raw.githubusercontent.com/zhaotianjing/nnmm_doc/main/data_simulation/y.csv&quot;).body
-omicsfile  = HTTP.get(&quot;https://raw.githubusercontent.com/zhaotianjing/nnmm_doc/main/data_simulation/omics.csv&quot;).body
-genofile   = HTTP.get(&quot;https://raw.githubusercontent.com/zhaotianjing/nnmm_doc/main/data_simulation/geno_n100_p200.csv&quot;).body
-phenotypes = CSV.read(phenofile,DataFrame)
-omics      = CSV.read(omicsfile,DataFrame)
-geno_df    = CSV.read(genofile,DataFrame)
+# Step 2: Load data
+geno_path = Datasets.dataset(&quot;genotypes_1000snps.txt&quot;, dataset_name=&quot;simulated_omics_data&quot;)
+pheno_path = Datasets.dataset(&quot;phenotypes_sim.txt&quot;, dataset_name=&quot;simulated_omics_data&quot;)
+pheno_df = CSV.read(pheno_path, DataFrame)
 
-insertcols!(omics, :residual =&gt; missing)  #create a hidden node to account for residuals
-omics[!,:residual] = convert(Vector{Union{Missing,Float64}}, omics[!,:residual]) #transform the datatype is required for Julia
-omics_names = names(omics)[2:end]  #get names of 10 omics and 1 hidden node
-insertcols!(omics,2,:y =&gt; phenotypes[:,:y], :bv =&gt; phenotypes[:,:bv]) #phenotype and omics should be in the same dataframe
+# Step 3: Create omics file WITH an extra &quot;residual&quot; column (all missing)
+omics_cols = vcat(:ID, [Symbol(&quot;omic$i&quot;) for i in 1:10])
+omics_df = pheno_df[:, omics_cols]
 
-genotypes = get_genotypes(geno_df,separator=&#39;,&#39;,method=&quot;BayesC&quot;)
+# Add residual column (all missing - will be sampled)
+omics_df[!, :residual] = fill(missing, nrow(omics_df))
 
-# Step 3: Build Model Equations
-model_equation  =&quot;y = intercept + genotypes&quot; 
-model = build_model(model_equation,
-		    num_hidden_nodes=11,   #10 omcis and 1 hidden node
-                    latent_traits=omics_names,
-		    nonlinear_function=&quot;sigmoid&quot;)
+omics_names = names(omics_df)[2:end]  # [&quot;omic1&quot;, ..., &quot;omic10&quot;, &quot;residual&quot;]
 
-# Step 4: Run Analysis
-out = runMCMC(model,omics,chain_length=5000,printout_model_info=false)
+omics_file = &quot;omics_with_residual.csv&quot;
+CSV.write(omics_file, omics_df; missingstring=&quot;NA&quot;)
 
-# Step 5: Check Accuruacy
-results    = innerjoin(out[&quot;EBV_NonLinear&quot;], omics, on = :ID)
-accuruacy  = cor(results[!,:EBV],results[!,:bv])</code></pre><p>Users can also add extra hidden nodes in the partial-connected neural network. Please check next documentation for building a partial-connected neural network.</p><h2 id="Output-files"><a class="docs-heading-anchor" href="#Output-files">Output files</a><a id="Output-files-1"></a><a class="docs-heading-anchor-permalink" href="#Output-files" title="Permalink"></a></h2><p>Same as those described in Part2.</p><h3 id="Julia-Tips:"><a class="docs-heading-anchor" href="#Julia-Tips:">Julia Tips:</a><a id="Julia-Tips:-1"></a><a class="docs-heading-anchor-permalink" href="#Julia-Tips:" title="Permalink"></a></h3><ul><li>You may want to set missing values manually, for example, setting the phenotypes for individuals in testing dataset as <code>missing</code>. Firstly, the type of  columns should be changed to allow <code>missing</code>, e.g., <code>phenotypes[!,:y] =  convert(Vector{Union{Missing,Float64}}, phenotypes[!,:y])</code>. Then, <code>missing</code> can be set manually, e.g., <code>phenotypes[10:11,:y1] .= missing</code> forces the 10th and 11th elements to be <code>missing</code>.</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../Part2_NNMM/">« Part 2. NNMM</a><a class="docs-footer-nextpage" href="../Part4_PartialConnectedNeuralNetwork/">Part 4. Partial connected neural network »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Monday 5 January 2026 02:58">Monday 5 January 2026</span>. Using Julia version 1.11.8.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+# Step 4: Create phenotype file
+trait_df = pheno_df[:, [:ID, :trait1]]
+trait_file = &quot;phenotypes_data.csv&quot;
+CSV.write(trait_file, trait_df; missingstring=&quot;NA&quot;)
+
+# Step 5: Define layers
+layers = [
+    Layer(layer_name = &quot;genotypes&quot;, data_path = [geno_path]),
+    Layer(layer_name = &quot;omics&quot;, data_path = omics_file, missing_value = &quot;NA&quot;),
+    Layer(layer_name = &quot;phenotypes&quot;, data_path = trait_file, missing_value = &quot;NA&quot;)
+]
+
+# Step 6: Define equations (11 features: 10 omics + 1 residual)
+equations = [
+    Equation(
+        from_layer_name = &quot;genotypes&quot;,
+        to_layer_name = &quot;omics&quot;,
+        equation = &quot;omics = intercept + genotypes&quot;,
+        omics_name = omics_names,  # Includes &quot;residual&quot;
+        method = &quot;BayesC&quot;,
+        estimatePi = true
+    ),
+    Equation(
+        from_layer_name = &quot;omics&quot;,
+        to_layer_name = &quot;phenotypes&quot;,
+        equation = &quot;phenotypes = intercept + omics&quot;,
+        phenotype_name = [&quot;trait1&quot;],
+        method = &quot;BayesC&quot;,
+        activation_function = &quot;sigmoid&quot;
+    )
+]
+
+# Step 7: Run analysis
+out = runNNMM(layers, equations;
+    chain_length = 5000,
+    burnin = 1000,
+    output_folder = &quot;nnmm_residual_results&quot;
+)
+
+# Step 8: Check accuracy
+ebv = out[&quot;EBV_NonLinear&quot;]
+
+# Convert ID types for joining
+ebv.ID = string.(ebv.ID)
+pheno_df.ID = string.(pheno_df.ID)
+
+if hasproperty(pheno_df, :genetic_total)
+    results = innerjoin(ebv, pheno_df[:, [:ID, :genetic_total]], on=:ID)
+    accuracy = cor(Float64.(results.EBV), results.genetic_total)
+    println(&quot;Prediction accuracy: &quot;, round(accuracy, digits=4))
+end
+
+# Cleanup
+rm(omics_file, force=true)
+rm(trait_file, force=true)</code></pre><h2 id="Handling-Missing-Omics-Data"><a class="docs-heading-anchor" href="#Handling-Missing-Omics-Data">Handling Missing Omics Data</a><a id="Handling-Missing-Omics-Data-1"></a><a class="docs-heading-anchor-permalink" href="#Handling-Missing-Omics-Data" title="Permalink"></a></h2><p>NNMM automatically handles missing omics values in the training set. Missing values are sampled using HMC based on:</p><ol><li>The upstream genotype layer (marker effects)</li><li>The downstream phenotype layer (via backpropagation)</li></ol><h3 id="Setting-Missing-Values-Manually"><a class="docs-heading-anchor" href="#Setting-Missing-Values-Manually">Setting Missing Values Manually</a><a id="Setting-Missing-Values-Manually-1"></a><a class="docs-heading-anchor-permalink" href="#Setting-Missing-Values-Manually" title="Permalink"></a></h3><pre><code class="language-julia hljs"># Convert column type to allow missing values
+omics_df[!, :omic1] = convert(Vector{Union{Missing, Float64}}, omics_df[!, :omic1])
+
+# Set specific values to missing
+omics_df[10:15, :omic1] .= missing  # Set rows 10-15 as missing for omic1
+
+# Set phenotypes for testing individuals as missing
+pheno_df[!, :trait1] = convert(Vector{Union{Missing, Float64}}, pheno_df[!, :trait1])
+pheno_df[90:100, :trait1] .= missing  # Testing individuals</code></pre><h2 id="Output-Files"><a class="docs-heading-anchor" href="#Output-Files">Output Files</a><a id="Output-Files-1"></a><a class="docs-heading-anchor-permalink" href="#Output-Files" title="Permalink"></a></h2><p>The output files are the same as described in <a href="../Part2_NNMM/">Part 2</a>, with omics names replacing latent node names.</p><h2 id="Tips"><a class="docs-heading-anchor" href="#Tips">Tips</a><a id="Tips-1"></a><a class="docs-heading-anchor-permalink" href="#Tips" title="Permalink"></a></h2><ol><li><p><strong>Many omics features</strong>: For large numbers of omics (&gt;100), set <code>printout_frequency</code> to a large value to reduce console output.</p></li><li><p><strong>Pre-processing</strong>: Center and scale omics data before running NNMM for better convergence.</p></li><li><p><strong>Testing individuals</strong>: Include individuals without phenotypes if they have omics data - this improves the genotype→omics model.</p></li><li><p><strong>Residual effects</strong>: Add a completely missing &quot;residual&quot; column to capture genetic variance not explained by omics.</p></li></ol></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../Part2_NNMM/">« Part 2. NNMM</a><a class="docs-footer-nextpage" href="../Part4_PartialConnectedNeuralNetwork/">Part 4. Partial connected neural network »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Monday 5 January 2026 18:49">Monday 5 January 2026</span>. Using Julia version 1.11.8.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
