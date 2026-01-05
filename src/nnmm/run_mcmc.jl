@@ -822,14 +822,14 @@ function runNNMM(layers, equations;
     ############################################################################
     # Set a seed in the random number generator
     ############################################################################
-    if seed != false
+    if seed !== false
         Random.seed!(seed)
-    end
-    #when using multi-thread, make sure the results are reproducible for users
-    nThread = Threads.nthreads()
-    if nThread>1
-        Threads.@threads for i = 1:nThread
-              Random.seed!(seed+i)
+        # When using multi-threading, also seed thread-local RNGs deterministically.
+        nThread = Threads.nthreads()
+        if nThread > 1
+            Threads.@threads for tid = 1:nThread
+                Random.seed!(seed + tid)
+            end
         end
     end
     ############################################################################

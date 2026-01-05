@@ -67,6 +67,12 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
     debug_invariants_iters_parsed = tryparse(Int, debug_invariants_iters_str)
     debug_invariants_iters        = debug_invariants_iters_parsed === nothing ? 5 : debug_invariants_iters_parsed
 
+    # Deterministic per-thread RNGs (used by threaded marker samplers) when a seed is provided.
+    thread_rngs = nothing
+    if mme1.MCMCinfo.seed !== false
+        thread_rngs = [Random.MersenneTwister(mme1.MCMCinfo.seed + tid) for tid in 1:Threads.nthreads()]
+    end
+
     ############################################################################
     # Working Variables
     # 1) samples at current iteration (starting values default to zeros)
@@ -352,6 +358,21 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         end
     end
 
+    # Precompute sparse incidence matrices used repeatedly inside the MCMC loop.
+    # These only depend on IDs (which are fixed during MCMC) and help avoid
+    # rebuilding and re-allocating sparse matrices each iteration.
+    Z_yobs_from_omics = nothing
+    if nonlinear_function != false && mme2.M != 0 && length(mme2.M) > 0
+        Z_yobs_from_omics = mkmat_incidence_factor(mme2.obsID, mme2.M[1].obsID)
+        Z_yobs_from_omics = map(mme1.MCMCinfo.double_precision ? Float64 : Float32, Z_yobs_from_omics)
+    end
+
+    Z_output_from_obs = nothing
+    if mme1.output_ID != 0 && mme1.output_ID != mme1.obsID
+        Z_output_from_obs = mkmat_incidence_factor(mme1.output_ID, mme1.obsID)
+        Z_output_from_obs = map(mme1.MCMCinfo.double_precision ? Float64 : Float32, Z_output_from_obs)
+    end
+
     @showprogress "running MCMC ..." for iter=1:chain_length
         
         #1->2
@@ -395,49 +416,49 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
                 ########################################################################
                 if Mi.method in ["BayesC","BayesB","BayesA"]
                     locus_effect_variances = (Mi.method == "BayesC" ? fill(Mi.G.val,Mi.nMarkers) : Mi.G.val)
-                    if is_multi_trait1 && !is_nnbayes_partial
-                        if Mi.G.constraint==true
-                            megaBayesABC!(Mi,wArray1,mme1.R.val,locus_effect_variances)
-                        else
-                            MTBayesABC!(Mi,wArray1,mme1.R.val,locus_effect_variances,mme1.nModels)
-                        end
+	                    if is_multi_trait1 && !is_nnbayes_partial
+	                        if Mi.G.constraint==true
+	                            megaBayesABC!(Mi, wArray1, mme1.R.val, locus_effect_variances; rngs=thread_rngs)
+	                        else
+	                            MTBayesABC!(Mi,wArray1,mme1.R.val,locus_effect_variances,mme1.nModels)
+	                        end
                     elseif is_nnbayes_partial
                         BayesABC!(Mi,wArray1[i],mme1.R.val[i,i],locus_effect_variances) #this can be parallelized (conflict with others)
                     else
                         BayesABC!(Mi,ycorr1,mme1.R.val,locus_effect_variances)
                     end
                 elseif Mi.method =="RR-BLUP"
-                    if is_multi_trait1 && !is_nnbayes_partial
-                        if Mi.G.constraint==true
-                            megaBayesC0!(Mi,wArray1,mme1.R.val)
-                        else
-                            MTBayesC0!(Mi,wArray1,mme1.R.val)
-                        end
+	                    if is_multi_trait1 && !is_nnbayes_partial
+	                        if Mi.G.constraint==true
+	                            megaBayesC0!(Mi, wArray1, mme1.R.val; rngs=thread_rngs)
+	                        else
+	                            MTBayesC0!(Mi,wArray1,mme1.R.val)
+	                        end
                     elseif is_nnbayes_partial
                         BayesC0!(Mi,wArray1[i],mme1.R.val[i,i])
                     else
                         BayesC0!(Mi,ycorr1,mme1.R.val)
                     end
                 elseif Mi.method == "BayesL"
-                    if is_multi_trait1 && !is_nnbayes_partial
-                        #problem with sampleGammaArray
-                        if Mi.G.constraint==true
-                            megaBayesL!(Mi,wArray1,mme1.R.val)
-                        else
-                            MTBayesL!(Mi,wArray1,mme1.R.val)
-                        end
+	                    if is_multi_trait1 && !is_nnbayes_partial
+	                        #problem with sampleGammaArray
+	                        if Mi.G.constraint==true
+	                            megaBayesL!(Mi, wArray1, mme1.R.val; rngs=thread_rngs)
+	                        else
+	                            MTBayesL!(Mi,wArray1,mme1.R.val)
+	                        end
                     elseif is_nnbayes_partial
                         BayesC0!(Mi,wArray1[i],mme1.R.val[i,i])
                     else
                         BayesL!(Mi,ycorr1,mme1.R.val)
                     end
                 elseif Mi.method == "GBLUP"
-                    if is_multi_trait1 && !is_nnbayes_partial
-                        if Mi.G.constraint==true
-                            megaGBLUP!(Mi,wArray1,mme1.R.val,invweights1)
-                        else
-                            MTGBLUP!(Mi,wArray1,ycorr1,mme1.R.val,invweights1)
-                        end
+	                    if is_multi_trait1 && !is_nnbayes_partial
+	                        if Mi.G.constraint==true
+	                            megaGBLUP!(Mi, wArray1, mme1.R.val, invweights1; rngs=thread_rngs)
+	                        else
+	                            MTGBLUP!(Mi,wArray1,ycorr1,mme1.R.val,invweights1)
+	                        end
                     elseif is_nnbayes_partial
                         GBLUP!(Mi,wArray1[i],mme1.R.val[i,i],invweights1)
                     else
@@ -527,25 +548,28 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
             end
         end
 
-        ########################################################################
-        # 5. Latent Traits (NNBayes) 
-        # to update ycorr1!
-        # from sample_latent_traits(yobs,mme,ycorr,nonlinear_function)
-        ########################################################################
-        yobs = mme1.yobs
-        ylats_old = mme1.ySparse          # current values of each latent trait; [trait_1_obs;trait_2_obs;...]
-        # μ_ylats   = mme1.ySparse - ycorr1 # mean of each latent trait, [trait_1_obs-residuals;trait_2_obs-residuals;...]
-        #                                 # = vcat(getEBV(mme,1).+mme.sol[1],getEBV(mme,2).+mme.sol[2]))
-        μ_ylats   = vcat((getEBV(mme1, i) for i in 1:mme1.nModels)...)  #cannot use "mme1.ySparse - ycorr1" becuase there may be other ramdon/fixed model terms                       
-        σ2_yobs      = mme1.σ2_yobs      # residual variance of yobs (scalar)
-        σ2_weightsNN = mme1.σ2_weightsNN # variance of nn weights between middle and output layers
-    
-        #reshape the vector to nind X ntraits
-        nobs, ntraits = length(mme1.obsID), mme1.nModels
-        ylats_old     = reshape(ylats_old,nobs,ntraits) #Tianjing's mme.Z
-        ylats_old2    = copy(ylats_old) #save original omics data before updating
-        μ_ylats       = reshape(μ_ylats,nobs,ntraits)
-        ycorr_reshape        = reshape(ycorr1,nobs,ntraits)
+	        ########################################################################
+	        # 5. Latent Traits (NNBayes) 
+	        # to update ycorr1!
+	        # from sample_latent_traits(yobs,mme,ycorr,nonlinear_function)
+	        ########################################################################
+	        yobs = mme1.yobs
+	        ylats_vec = vec(mme1.ySparse)          # current values of each latent trait; stacked by trait
+	        # Mean of each latent trait under the 1→2 model:
+	        #   y_lats = μ_ylats + e, where e has residuals `ycorr1` and var `mme1.R.val`.
+	        # Since `ycorr1` is maintained as the full residual (y_lats - μ_ylats),
+	        # we can recover μ_ylats as (y_lats - ycorr1), which includes ALL non-marker
+	        # fixed/random terms in `mme1.X * mme1.sol` plus marker terms.
+	        μ_ylats_vec = ylats_vec .- ycorr1
+	        σ2_yobs      = mme1.σ2_yobs      # residual variance of yobs (scalar)
+	        σ2_weightsNN = mme1.σ2_weightsNN # variance of nn weights between middle and output layers
+	    
+	        #reshape the vector to nind X ntraits
+	        nobs, ntraits = length(mme1.obsID), mme1.nModels
+	        ylats_old     = reshape(ylats_vec, nobs, ntraits) #Tianjing's mme.Z
+	        ylats_old2    = copy(ylats_old) #save original omics data before updating
+	        μ_ylats       = reshape(μ_ylats_vec, nobs, ntraits)
+	        ycorr_reshape        = reshape(ycorr1,nobs,ntraits)
     
         #sample latent traits (omics) only where omics are incomplete
         incomplete_omics = mme1.incomplete_omics #indicator for ind with no/partial omics
@@ -555,16 +579,14 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
             incomplete_with_yobs = incomplete_omics .& has_yobs
             incomplete_no_yobs   = incomplete_omics .& .!has_yobs
 
-            if any(incomplete_with_yobs)
-                if mme1.is_activation_fcn == true #Neural Network with activation function (incl. linear)
-                    #step 1. sample latent traits for incomplete inds with observed yobs
-                    Z = map(mme1.MCMCinfo.double_precision ? Float64 : Float32,
-                            mkmat_incidence_factor(mme2.obsID, mme2.M[1].obsID))
-                    ycorr2_sel = BitVector(Z * incomplete_with_yobs)
-                    ylats_new = hmc_one_iteration(10, 0.1,
-                                                 ylats_old[incomplete_with_yobs, :],
-                                                 yobs[incomplete_with_yobs],
-                                                 mme1.weights_NN, mme1.R.val, σ2_yobs,
+	            if any(incomplete_with_yobs)
+	                if mme1.is_activation_fcn == true #Neural Network with activation function (incl. linear)
+	                    #step 1. sample latent traits for incomplete inds with observed yobs
+	                    ycorr2_sel = BitVector(Z_yobs_from_omics * incomplete_with_yobs)
+	                    ylats_new = hmc_one_iteration(10, 0.1,
+	                                                 ylats_old[incomplete_with_yobs, :],
+	                                                 yobs[incomplete_with_yobs],
+	                                                 mme1.weights_NN, mme1.R.val, σ2_yobs,
                                                  ycorr_reshape[incomplete_with_yobs, :],
                                                  nonlinear_function,
                                                  ycorr2[ycorr2_sel])
@@ -700,49 +722,49 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
                 ########################################################################
                 if Mi.method in ["BayesC","BayesB","BayesA"]
                     locus_effect_variances = (Mi.method == "BayesC" ? fill(Mi.G.val,Mi.nFeatures) : Mi.G.val)
-                    if is_multi_trait2 && !is_nnbayes_partial
-                        if Mi.G.constraint==true
-                            megaBayesABC!(Mi,wArray2,mme2.R.val,locus_effect_variances)
-                        else
-                            MTBayesABC!(Mi,wArray2,mme2.R.val,locus_effect_variances,mme2.nModels)
-                        end
+	                    if is_multi_trait2 && !is_nnbayes_partial
+	                        if Mi.G.constraint==true
+	                            megaBayesABC!(Mi, wArray2, mme2.R.val, locus_effect_variances; rngs=thread_rngs)
+	                        else
+	                            MTBayesABC!(Mi,wArray2,mme2.R.val,locus_effect_variances,mme2.nModels)
+	                        end
                     elseif is_nnbayes_partial
                         BayesABC!(Mi,wArray2[i],mme2.R.val[i,i],locus_effect_variances) #this can be parallelized (conflict with others)
                     else
                         BayesABC!(Mi,ycorr2,mme2.R.val,locus_effect_variances)
                     end
                 elseif Mi.method =="RR-BLUP"
-                    if is_multi_trait2 && !is_nnbayes_partial
-                        if Mi.G.constraint==true
-                            megaBayesC0!(Mi,wArray2,mme2.R.val)
-                        else
-                            MTBayesC0!(Mi,wArray2,mme2.R.val)
-                        end
+	                    if is_multi_trait2 && !is_nnbayes_partial
+	                        if Mi.G.constraint==true
+	                            megaBayesC0!(Mi, wArray2, mme2.R.val; rngs=thread_rngs)
+	                        else
+	                            MTBayesC0!(Mi,wArray2,mme2.R.val)
+	                        end
                     elseif is_nnbayes_partial
                         BayesC0!(Mi,wArray2[i],mme2.R.val[i,i])
                     else
                         BayesC0!(Mi,ycorr2,mme2.R.val)
                     end
                 elseif Mi.method == "BayesL"
-                    if is_multi_trait2 && !is_nnbayes_partial
-                        #problem with sampleGammaArray
-                        if Mi.G.constraint==true
-                            megaBayesL!(Mi,wArray2,mme2.R.val)
-                        else
-                            MTBayesL!(Mi,wArray2,mme2.R.val)
-                        end
+	                    if is_multi_trait2 && !is_nnbayes_partial
+	                        #problem with sampleGammaArray
+	                        if Mi.G.constraint==true
+	                            megaBayesL!(Mi, wArray2, mme2.R.val; rngs=thread_rngs)
+	                        else
+	                            MTBayesL!(Mi,wArray2,mme2.R.val)
+	                        end
                     elseif is_nnbayes_partial
                         BayesC0!(Mi,wArray2[i],mme2.R.val[i,i])
                     else
                         BayesL!(Mi,ycorr2,mme2.R.val)
                     end
                 elseif Mi.method == "GBLUP"
-                    if is_multi_trait2 && !is_nnbayes_partial
-                        if Mi.G.constraint==true
-                            megaGBLUP!(Mi,wArray2,mme2.R.val,invweights2)
-                        else
-                            MTGBLUP!(Mi,wArray2,ycorr2,mme2.R.val,invweights2)
-                        end
+	                    if is_multi_trait2 && !is_nnbayes_partial
+	                        if Mi.G.constraint==true
+	                            megaGBLUP!(Mi, wArray2, mme2.R.val, invweights2; rngs=thread_rngs)
+	                        else
+	                            MTGBLUP!(Mi,wArray2,ycorr2,mme2.R.val,invweights2)
+	                        end
                     elseif is_nnbayes_partial
                         GBLUP!(Mi,wArray2[i],mme2.R.val[i,i],invweights2)
                     else
@@ -881,20 +903,18 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
             end
 
             # Save EPV on output IDs (includes test individuals even if phenotype is missing).
-            if mme1.output_ID != 0 && haskey(outfile, "EPV_Output_NonLinear")
-                # `ylats_old` is the current latent/observed omics matrix in mme1.obsID order.
-                # Align to mme1.output_ID order if needed, then compute EPV under the same
-                # nonlinearity settings used by EBV_NonLinear.
-                omics_out = ylats_old
-                if mme1.output_ID != mme1.obsID
-                    Zout = map(mme1.MCMCinfo.double_precision ? Float64 : Float32,
-                               mkmat_incidence_factor(mme1.output_ID, mme1.obsID))
-                    omics_out = Zout * omics_out
-                end
-                if mme1.is_activation_fcn == true
-                    omics_out = nonlinear_function.(omics_out)
-                    EPV_out = omics_out * mme1.weights_NN
-                else
+	            if mme1.output_ID != 0 && haskey(outfile, "EPV_Output_NonLinear")
+	                # `ylats_old` is the current latent/observed omics matrix in mme1.obsID order.
+	                # Align to mme1.output_ID order if needed, then compute EPV under the same
+	                # nonlinearity settings used by EBV_NonLinear.
+	                omics_out = ylats_old
+	                if Z_output_from_obs !== nothing
+	                    omics_out = Z_output_from_obs * omics_out
+	                end
+	                if mme1.is_activation_fcn == true
+	                    omics_out = nonlinear_function.(omics_out)
+	                    EPV_out = omics_out * mme1.weights_NN
+	                else
                     EPV_out = mme1.nonlinear_function.(Tuple([view(omics_out, :, i) for i in 1:size(omics_out, 2)])...)
                 end
                 writedlm(outfile["EPV_Output_NonLinear"], EPV_out', ',')

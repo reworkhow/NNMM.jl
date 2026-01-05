@@ -41,6 +41,13 @@ benchmarks/results/
 benchmarks/.mplconfig/
 benchmarks/.cache/
 
+# Large benchmark/debug artifacts (keep local; do not commit)
+benchmarks/epv_nan_debug_*/
+doc_test2/
+doc_test_results/
+t*_out*/
+t*_*.csv
+
 # Coverage
 lcov.info
 *.cov

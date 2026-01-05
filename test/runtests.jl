@@ -37,4 +37,7 @@ using NNMM
     
     # Post-analysis functions (GWAS, getEBV)
     include("test_post_analysis.jl")
+
+    # Internal debug invariants / regression checks
+    include("test_invariants.jl")
 end

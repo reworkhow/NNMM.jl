@@ -316,10 +316,12 @@ function genetic2marker(M::Genotypes,Pi::Dict)
   M.G.val = M.genetic_variance.val ./ denom
 end
 
-function genetic2marker(M::Genotypes,π::Float64)
-    M.G.val = M.genetic_variance.val/((1-π)*M.sum2pq)
+function genetic2marker(M::Genotypes, π::Real)
+    πf = Float64(π)
+    M.G.val = M.genetic_variance.val / ((1 - πf) * M.sum2pq)
 end
 
-function genetic2marker(M::Omics,π::Float64)
-    M.G.val = M.genetic_variance.val/((1-π)*M.nFeatures)
+function genetic2marker(M::Omics, π::Real)
+    πf = Float64(π)
+    M.G.val = M.genetic_variance.val / ((1 - πf) * M.nFeatures)
 end

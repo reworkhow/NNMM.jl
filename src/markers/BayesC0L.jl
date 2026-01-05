@@ -1,31 +1,33 @@
-function megaBayesL!(genotypes,wArray,vare)
+function megaBayesL!(genotypes, wArray, vare; rngs=nothing)
     Threads.@threads for i in 1:length(wArray) #ntraits
+        rng = rngs === nothing ? Random.default_rng() : rngs[Threads.threadid()]
         BayesL!(genotypes.mArray,genotypes.mRinvArray,genotypes.mpRinvm,
-            wArray[i],genotypes.α[i],genotypes.gammaArray,vare[i,i],genotypes.G.val[i,i])
+            wArray[i],genotypes.α[i],genotypes.gammaArray,vare[i,i],genotypes.G.val[i,i]; rng=rng)
     end
 end
 
-function BayesL!(genotypes,ycorr,vare)
+function BayesL!(genotypes, ycorr, vare; rng=Random.default_rng())
     BayesL!(genotypes.mArray,genotypes.mRinvArray,genotypes.mpRinvm,
-            ycorr,genotypes.α[1],genotypes.gammaArray,vare,genotypes.G.val)
+            ycorr,genotypes.α[1],genotypes.gammaArray,vare,genotypes.G.val; rng=rng)
 end
 
-function megaBayesC0!(genotypes,wArray,vare)
+function megaBayesC0!(genotypes, wArray, vare; rngs=nothing)
     Threads.@threads for i in 1:length(wArray) #ntraits
+        rng = rngs === nothing ? Random.default_rng() : rngs[Threads.threadid()]
         BayesL!(genotypes.mArray,genotypes.mRinvArray,genotypes.mpRinvm,
-                wArray[i],genotypes.α[i],[1.0],vare[i,i],genotypes.G.val[i,i])
+                wArray[i],genotypes.α[i],[1.0],vare[i,i],genotypes.G.val[i,i]; rng=rng)
     end
 end
 
-function BayesC0!(genotypes,ycorr,vare)
+function BayesC0!(genotypes, ycorr, vare; rng=Random.default_rng())
     BayesL!(genotypes.mArray,genotypes.mRinvArray,genotypes.mpRinvm,
-            ycorr,genotypes.α[1],[1.0],vare,genotypes.G.val)
+            ycorr,genotypes.α[1],[1.0],vare,genotypes.G.val; rng=rng)
 end
 
 function BayesL!(xArray,xRinvArray,xpRinvx,
                  yCorr,
                  α,gammaArray,
-                 vRes,vEff)
+                 vRes,vEff; rng=Random.default_rng())
     nMarkers = length(α)
     λ        = vRes/vEff
     function get_lambda_function(x)
@@ -41,7 +43,7 @@ function BayesL!(xArray,xRinvArray,xpRinvx,
         invLhs   = 1.0/lhs
         mean     = invLhs*rhs
         oldAlpha = α[j]
-        α[j]     = mean + randn()*sqrt(invLhs*vRes)
+        α[j]     = mean + randn(rng)*sqrt(invLhs*vRes)
         BLAS.axpy!(oldAlpha-α[j],x,yCorr)
     end
 end

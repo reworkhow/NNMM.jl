@@ -94,18 +94,20 @@ function hmc_one_iteration(nLeapfrog,ϵ,ylats_old,yobs,weights_NN,σ_ylats,σ_yo
     ylats_old = copy(ylats_old)
     ylats_new = copy(ylats_old)
     is_linear_activation = occursin("mylinear", string(nameof(typeof(activation_function))))
+    T = eltype(ylats_new)
+    ϵT = T(ϵ)
 
     #step 1: Initiate Φ from N(0,M)
-    Φ = randn(nobs, ntraits) #rand(n,Normal(0,M=1.0)), tuning parameter: M
+    Φ = randn(T, nobs, ntraits) #rand(n,Normal(0,M=1.0)), tuning parameter: M
     log_p_old = calc_log_p_z(ylats_old,yobs,weights_NN,σ_ylats,σ_yobs,ycorr,activation_function,ycorr_yobs) - 0.5*sum(Φ.^2,dims=2)  #(n,1)
     #step 2: update (ylats,Φ) from 10 leapfrog
     #2(a): update Φ
-    Φ += 0.5 * ϵ * calc_gradient_z(ylats_new,yobs,weights_NN,σ_ylats,σ_yobs,ycorr,activation_function,ycorr_yobs)  #(n,l1)
+    Φ += (ϵT/2) * calc_gradient_z(ylats_new,yobs,weights_NN,σ_ylats,σ_yobs,ycorr,activation_function,ycorr_yobs)  #(n,l1)
     for leap_i in 1:nLeapfrog
        #2(b) update latent traits
        ylats_tmp = copy(ylats_new) #ylat before update
-       ylats_new += ϵ * Φ  # (n,l1)
-       ycorr     += ϵ * Φ  #update ycorr due to change of Z
+       ylats_new += ϵT * Φ  # (n,l1)
+       ycorr     += ϵT * Φ  #update ycorr due to change of Z
        if is_linear_activation
            ycorr_yobs += (ylats_tmp - ylats_new) * weights_NN
        else
@@ -114,17 +116,17 @@ function hmc_one_iteration(nLeapfrog,ϵ,ylats_old,yobs,weights_NN,σ_ylats,σ_yo
        #(c) half step of phi
        if leap_i == nLeapfrog
            #2(c): update Φ
-           Φ += 0.5 * ϵ * calc_gradient_z(ylats_new,yobs,weights_NN,σ_ylats,σ_yobs,ycorr,activation_function,ycorr_yobs)
+           Φ += (ϵT/2) * calc_gradient_z(ylats_new,yobs,weights_NN,σ_ylats,σ_yobs,ycorr,activation_function,ycorr_yobs)
        else
            #2(a)+2(c): update Φ
-           Φ += ϵ * calc_gradient_z(ylats_new,yobs,weights_NN,σ_ylats,σ_yobs,ycorr,activation_function,ycorr_yobs)
+           Φ += ϵT * calc_gradient_z(ylats_new,yobs,weights_NN,σ_ylats,σ_yobs,ycorr,activation_function,ycorr_yobs)
        end
     end
 
     #Step3. acceptance rate
     log_p_new = calc_log_p_z(ylats_new,yobs,weights_NN,σ_ylats,σ_yobs,ycorr,activation_function,ycorr_yobs) - 0.5*sum(Φ.^2,dims=2) #(n,1)
     r         = exp.(log_p_new - log_p_old)  # (n,1)
-    nojump    = rand(nobs) .> r  # bool (n,1)
+    nojump    = rand(T, nobs) .> r  # bool (n,1)
 
     for i in 1:nobs
         if nojump[i]

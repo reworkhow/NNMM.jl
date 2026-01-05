@@ -30,21 +30,22 @@ function GBLUP_setup(Mi::Genotypes) #for both single-trait and multi-trait analy
     Mi.D         = abs.(D) #avoid very small negative values
 end
 
-function megaGBLUP!(Mi::Genotypes,wArray,vare,Rinv)
+function megaGBLUP!(Mi::Genotypes, wArray, vare, Rinv; rngs=nothing)
     Threads.@threads for i in 1:length(wArray) #ntraits
-        GBLUP!(Mi.genotypes,Mi.α[i],Mi.D,wArray[i],vare[i,i],Mi.G.val[i,i],Rinv,Mi.nObs)
+        rng = rngs === nothing ? Random.default_rng() : rngs[Threads.threadid()]
+        GBLUP!(Mi.genotypes, Mi.α[i], Mi.D, wArray[i], vare[i,i], Mi.G.val[i,i], Rinv, Mi.nObs; rng=rng)
     end
 end
 
-function GBLUP!(Mi::Genotypes,ycorr,vare,Rinv) #single-trait
-    GBLUP!(Mi.genotypes,Mi.α[1],Mi.D,ycorr,vare,Mi.G.val[1,1],Rinv,Mi.nObs)
+function GBLUP!(Mi::Genotypes, ycorr, vare, Rinv; rng=Random.default_rng()) #single-trait
+    GBLUP!(Mi.genotypes, Mi.α[1], Mi.D, ycorr, vare, Mi.G.val[1,1], Rinv, Mi.nObs; rng=rng)
 end
 
-function GBLUP!(genotypes,α,D,ycorr,vare,vara,Rinv,nObs)
+function GBLUP!(genotypes, α, D, ycorr, vare, vara, Rinv, nObs; rng=Random.default_rng())
     ycorr[:]    = ycorr + genotypes*α #ycor[:] is needed (ycor causes problems)
     lhs         = Rinv .+ vare./(vara*D)
     mean1       = genotypes'*(Rinv.*ycorr)./lhs
-    α[:]        = mean1 + randn(nObs).*sqrt.(vare./lhs)
+    α[:]        = mean1 + randn(rng, nObs).*sqrt.(vare./lhs)
     ycorr[:]    = ycorr - genotypes*α
 end
 

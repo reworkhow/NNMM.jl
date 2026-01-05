@@ -41,9 +41,22 @@ function prediction_setup(model)
             "proportion of phenotypic variance explained by the value defined by the prediction equation.\n",
             bold=false,color=:green)
         end
+
+        # Marker terms (genotypes/omics) are always included for now, so allow users to
+        # mention them in the prediction equation without relying on `Main` globals.
+        marker_term_names = Set{String}(["genotypes"])
+        if model.M != 0
+            for Mi in model.M
+                if hasproperty(Mi, :name) && Mi.name !== false
+                    push!(marker_term_names, string(Mi.name))
+                end
+            end
+        end
+
         for i in prediction_equation
             term_symbol = Symbol(split(i,":")[end])
-            if !(haskey(model.modelTermDict,i) || (isdefined(Main,term_symbol) && typeof(getfield(Main,term_symbol)) == Genotypes))
+            term_name = string(term_symbol)
+            if !(haskey(model.modelTermDict,i) || (term_name in marker_term_names))
                 error("Terms $i in the prediction equation is not found.")
             end
         end
@@ -54,7 +67,7 @@ function prediction_setup(model)
         println("Default or user-defined prediction equation are not available.")
         model.MCMCinfo.outputEBV = false
     end
-    filter!(e->(e in keys(model.modelTermDict)),prediction_equation) #remove "genotypes" for now
+    filter!(e->(e in keys(model.modelTermDict)),prediction_equation) #remove marker terms for now (marker data is always included)
     model.MCMCinfo.prediction_equation = prediction_equation
 end
 
@@ -159,15 +172,15 @@ function output_result(mme,output_folder,
           push!(EBVkeys, "EBV_NonLinear")
           EBVkeys=[EBVkeys[end]]  #only keep "EBV_NonLinear" (remove EBV_gene1, EBV_gene2,...)
       end
-      for EBVkey in EBVkeys
-          EBVsamplesfile = output_file*"_"*EBVkey*".txt"
-          EBVsamples,IDs = readdlm(EBVsamplesfile,',',header=true)
-          EBV            = vec(mean(EBVsamples,dims=1))
-          PEV            = vec(var(EBVsamples,dims=1))
-          if vec(IDs) == mme.output_ID
-              output[EBVkey] = DataFrame([mme.output_ID EBV PEV],[:ID,:EBV,:PEV])
-          else
-              error("The EBV file is wrong.")
+	      for EBVkey in EBVkeys
+	          EBVsamplesfile = output_file*"_"*EBVkey*".txt"
+	          EBVsamples,IDs = readdlm(EBVsamplesfile,',',header=true)
+	          EBV            = vec(mean(EBVsamples,dims=1))
+	          PEV            = vec(var(EBVsamples, dims=1, corrected=true))
+	          if vec(IDs) == mme.output_ID
+	              output[EBVkey] = DataFrame([mme.output_ID EBV PEV],[:ID,:EBV,:PEV])
+	          else
+	              error("The EBV file is wrong.")
           end
       end
       if mme.MCMCinfo.output_heritability == true  && mme.MCMCinfo.single_step_analysis == false
@@ -176,49 +189,49 @@ function output_result(mme,output_folder,
           else
               genetic_trm = ["genetic_variance","heritability"]
           end
-          for i in genetic_trm
-              samplesfile = output_file*"_"*i*".txt"
-              samples,names = readdlm(samplesfile,',',header=true)
-              samplemean    = vec(mean(samples,dims=1))
-              samplevar     = vec(std(samples,dims=1))
-              output[i] = DataFrame([vec(names) samplemean samplevar],[:Covariance,:Estimate,:SD])
-          end
-      end
+	          for i in genetic_trm
+	              samplesfile = output_file*"_"*i*".txt"
+	              samples,names = readdlm(samplesfile,',',header=true)
+	              samplemean    = vec(mean(samples,dims=1))
+	              samplevar     = vec(std(samples, dims=1, corrected=true))
+	              output[i] = DataFrame([vec(names) samplemean samplevar],[:Covariance,:Estimate,:SD])
+	          end
+	      end
       # Read EPV_NonLinear (Estimated Phenotypic Value using observed omics)
-      if mme.nonlinear_function != false
-          EPVsamplesfile = output_file*"_EPV_NonLinear.txt"
-          if isfile(EPVsamplesfile)
-              EPVsamples,EPV_IDs = readdlm(EPVsamplesfile,',',header=true)
-              EPV_mean = vec(mean(EPVsamples,dims=1))
-              EPV_var  = vec(var(EPVsamples,dims=1))
-              # EPV has IDs for phenotyped individuals (may be different from all individuals)
-              output["EPV_NonLinear"] = DataFrame([vec(EPV_IDs) EPV_mean EPV_var],[:ID,:EPV,:PEV])
-          end
+	      if mme.nonlinear_function != false
+	          EPVsamplesfile = output_file*"_EPV_NonLinear.txt"
+	          if isfile(EPVsamplesfile)
+	              EPVsamples,EPV_IDs = readdlm(EPVsamplesfile,',',header=true)
+	              EPV_mean = vec(mean(EPVsamples,dims=1))
+	              EPV_var  = vec(var(EPVsamples, dims=1, corrected=true))
+	              # EPV has IDs for phenotyped individuals (may be different from all individuals)
+	              output["EPV_NonLinear"] = DataFrame([vec(EPV_IDs) EPV_mean EPV_var],[:ID,:EPV,:PEV])
+	          end
 
           # EPV on output IDs (includes test individuals with missing phenotypes).
-          EPVout_samplesfile = output_file*"_EPV_Output_NonLinear.txt"
-          if isfile(EPVout_samplesfile)
-              EPVout_samples,EPVout_IDs = readdlm(EPVout_samplesfile,',',header=true)
-              EPVout_mean = vec(mean(EPVout_samples,dims=1))
-              EPVout_var  = vec(var(EPVout_samples,dims=1))
-              if vec(EPVout_IDs) == mme.output_ID
-                  output["EPV_Output_NonLinear"] = DataFrame([mme.output_ID EPVout_mean EPVout_var],[:ID,:EPV,:PEV])
-              else
-                  error("The EPV output file is wrong.")
+	          EPVout_samplesfile = output_file*"_EPV_Output_NonLinear.txt"
+	          if isfile(EPVout_samplesfile)
+	              EPVout_samples,EPVout_IDs = readdlm(EPVout_samplesfile,',',header=true)
+	              EPVout_mean = vec(mean(EPVout_samples,dims=1))
+	              EPVout_var  = vec(var(EPVout_samples, dims=1, corrected=true))
+	              if vec(EPVout_IDs) == mme.output_ID
+	                  output["EPV_Output_NonLinear"] = DataFrame([mme.output_ID EPVout_mean EPVout_var],[:ID,:EPV,:PEV])
+	              else
+	                  error("The EPV output file is wrong.")
               end
           end
       end
-      if mme.nonlinear_function != false && mme.is_activation_fcn == true  #Neural Network with activation function
-          myvar         = "neural_networks_bias_and_weights"
-          samplesfile   = output_file*"_"*myvar*".txt"
-          samples       = readdlm(samplesfile,',',header=false)
-          names         = ["bias";"weight".*string.(1:(size(samples,2)-1))]
-          samplemean    = vec(mean(samples,dims=1))
-          samplevar     = vec(std(samples,dims=1))
-          output[myvar] = DataFrame([vec(names) samplemean samplevar],[:weights,:Estimate,:SD])
-      end
-  end
-  return output
+	      if mme.nonlinear_function != false && mme.is_activation_fcn == true  #Neural Network with activation function
+	          myvar         = "neural_networks_bias_and_weights"
+	          samplesfile   = output_file*"_"*myvar*".txt"
+	          samples       = readdlm(samplesfile,',',header=false)
+	          names         = ["bias";"weight".*string.(1:(size(samples,2)-1))]
+	          samplemean    = vec(mean(samples,dims=1))
+	          samplevar     = vec(std(samples, dims=1, corrected=true))
+	          output[myvar] = DataFrame([vec(names) samplemean samplevar],[:weights,:Estimate,:SD])
+	      end
+	  end
+	  return output
 end
 
 #Reformat Output Array to DataFrame
@@ -528,12 +541,12 @@ function output_MCMC_samples(mme,vRes,G0,
          end
 
          if mme.MCMCinfo.output_heritability == true && mme.MCMCinfo.single_step_analysis == false
-             #single-trait: a scalar ;  multi-trait: a matrix; mega-trait: a vector
-             if mme.M != 0 && mme.M[1].G.constraint==true
-                mygvar = Diagonal(vec(var(EBVmat,dims=1)))
-             else
-                mygvar = cov(EBVmat)
-             end
+	             #single-trait: a scalar ;  multi-trait: a matrix; mega-trait: a vector
+	             if mme.M != 0 && mme.M[1].G.constraint==true
+	                mygvar = Diagonal(vec(var(EBVmat, dims=1, corrected=true)))
+	             else
+	                mygvar = cov(EBVmat)
+	             end
              genetic_variance = (ntraits == 1 ? mygvar : vec(mygvar)')
              if mme.MCMCinfo.RRM == false
                  vRes = mme.R.constraint==true ? Diagonal(vRes) : vRes #change to diagonal matrix to avoid error

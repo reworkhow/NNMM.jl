@@ -29,28 +29,29 @@ Multi-threaded BayesABC sampler for independent traits.
 Used when `constraint=true` (diagonal covariance), allowing parallel
 sampling across traits.
 """
-function megaBayesABC!(genotypes,wArray,vare,locus_effect_variances)
+function megaBayesABC!(genotypes, wArray, vare, locus_effect_variances; rngs=nothing)
     Threads.@threads for i in 1:length(wArray) #ntraits
-         BayesABC!(genotypes.mArray,genotypes.mRinvArray,genotypes.mpRinvm,
-                    wArray[i],genotypes.α[i],genotypes.β[i],genotypes.δ[i],vare[i,i],
-                    [vari[i,i] for vari in locus_effect_variances],genotypes.π[i])
+        rng = rngs === nothing ? Random.default_rng() : rngs[Threads.threadid()]
+        BayesABC!(genotypes.mArray, genotypes.mRinvArray, genotypes.mpRinvm,
+                  wArray[i], genotypes.α[i], genotypes.β[i], genotypes.δ[i], vare[i,i],
+                  [vari[i,i] for vari in locus_effect_variances], genotypes.π[i]; rng=rng)
     end
 end
 
 
-function BayesABC!(genotypes,ycorr,vare,locus_effect_variances)
+function BayesABC!(genotypes, ycorr, vare, locus_effect_variances; rng=Random.default_rng())
     BayesABC!(genotypes.mArray,genotypes.mRinvArray,genotypes.mpRinvm,
               ycorr,genotypes.α[1],genotypes.β[1],genotypes.δ[1],vare,
-              locus_effect_variances,genotypes.π)
+              locus_effect_variances,genotypes.π; rng=rng)
 end
 
 function BayesABC!(xArray,xRinvArray,xpRinvx,
                    yCorr,
                    α,β,δ,
-                   vare,varEffects,π)
+                   vare,varEffects,π; rng=Random.default_rng())
 
     logPi         = log(π)
-    logPiComp     = log(1-π)
+    logPiComp     = log1p(-π)
     logDelta0     = logPi
     invVarRes     = 1/vare
     invVarEffects = 1 ./  varEffects
@@ -67,9 +68,9 @@ function BayesABC!(xArray,xRinvArray,xpRinvx,
         probDelta1 = 1/(1+ exp(logDelta0 - logDelta1))
         oldAlpha = α[j]
 
-        if(rand()<probDelta1)
+        if rand(rng) < probDelta1
             δ[j] = 1
-            β[j] = gHat + randn()*sqrt(invLhs)
+            β[j] = gHat + randn(rng)*sqrt(invLhs)
             α[j] = β[j]
             BLAS.axpy!(oldAlpha-α[j],x,yCorr)
         else
@@ -77,28 +78,28 @@ function BayesABC!(xArray,xRinvArray,xpRinvx,
                 BLAS.axpy!(oldAlpha,x,yCorr)
             end
             δ[j] = 0
-            β[j] = randn()*sqrt(varEffects[j])
+            β[j] = randn(rng)*sqrt(varEffects[j])
             α[j] = 0
         end
     end
 end
 
 
-function BayesABC_block!(genotypes,ycorr,vare,locus_effect_variances)
+function BayesABC_block!(genotypes, ycorr, vare, locus_effect_variances; rng=Random.default_rng())
     BayesABC_block!(genotypes.MArray,genotypes.MRinvArray,genotypes.mpRinvm,
               genotypes.genotypes,genotypes.MpRinvM,
               ycorr,genotypes.α[1],genotypes.β[1],genotypes.δ[1],vare,
-              locus_effect_variances,genotypes.π)
+              locus_effect_variances,genotypes.π; rng=rng)
 end
 
 function BayesABC_block!(XArray,XRinvArray,xpRinvx,
                    X, XpRinvX,
                    yCorr,
                    α,β,δ,
-                   vare,varEffects,π)
+                   vare,varEffects,π; rng=Random.default_rng())
 
     logPi         = log(π)
-    logPiComp     = log(1-π)
+    logPiComp     = log1p(-π)
     logDelta0     = logPi
     invVarRes     = 1/vare
     invVarEffects = 1 ./  varEffects
@@ -123,9 +124,9 @@ function BayesABC_block!(XArray,XRinvArray,xpRinvx,
                 probDelta1 = 1/(1+ exp(logDelta0 - logDelta1))
                 oldAlpha   = α[locus_j]
 
-                if rand() < probDelta1
+                if rand(rng) < probDelta1
                     δ[locus_j] = 1
-                    β[locus_j] = gHat + randn()*sqrt(invLhs)
+                    β[locus_j] = gHat + randn(rng)*sqrt(invLhs)
                     α[locus_j] = β[locus_j]
                     BLAS.axpy!(oldAlpha-α[locus_j],view(XpRinvX[i],:,j),XpRinvycorr)
                 else
@@ -133,7 +134,7 @@ function BayesABC_block!(XArray,XRinvArray,xpRinvx,
                         BLAS.axpy!(oldAlpha,view(XpRinvX[i],:,j),XpRinvycorr)
                     end
                     δ[locus_j] = 0
-                    β[locus_j] = randn()*sqrt(varEffects[locus_j])
+                    β[locus_j] = randn(rng)*sqrt(varEffects[locus_j])
                     α[locus_j] = 0
                 end
             end

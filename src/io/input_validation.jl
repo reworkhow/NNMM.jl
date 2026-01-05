@@ -22,10 +22,12 @@ function errors_args(mme)
             end
 
             if Mi.method in ["RR-BLUP","BayesL","GBLUP","BayesA"]
-                if Mi.π != false
+                # NOTE: use `!==` here because `false == 0` in Julia.
+                if Mi.π !== false
                     printstyled(Mi.method," runs with π = false.\n",bold=false,color=:red)
                     Mi.π = false
-                elseif Mi.estimatePi == true
+                end
+                if Mi.estimatePi == true
                     printstyled(Mi.method," runs with estimatePi = false.\n",bold=false,color=:red)
                     Mi.estimatePi = false
                 end
@@ -50,6 +52,33 @@ function errors_args(mme)
                 end
                 if typeof(Mi.π) <: Number
                     error("Pi cannot be a number in multi-trait analysis.")
+                end
+            end
+
+            # Validate Pi (π/Π) values when provided.
+            # - Single-trait / independent-trait models: π is a Number or Vector, each in [0, 1]
+            # - Correlated multi-trait models: Π is a Dict with probabilities in [0, 1] and (approximately) summing to 1
+            if Mi.π !== false
+                if Mi.π isa Number
+                    π = Float64(Mi.π)
+                    if !isfinite(π) || π < 0.0 || π > 1.0
+                        error("π must be a finite number in [0,1].")
+                    end
+                elseif Mi.π isa AbstractVector
+                    for π in Mi.π
+                        πv = Float64(π)
+                        if !isfinite(πv) || πv < 0.0 || πv > 1.0
+                            error("Each π must be a finite number in [0,1].")
+                        end
+                    end
+                else
+                    # Dict-like Π (multi-trait) probabilities
+                    for π in values(Mi.π)
+                        πv = Float64(π)
+                        if !isfinite(πv) || πv < 0.0 || πv > 1.0
+                            error("Each Π entry must be a finite number in [0,1].")
+                        end
+                    end
                 end
             end
         end
@@ -226,7 +255,8 @@ function check_pedigree_genotypes_phenotypes(mme,df,pedigree)
 end
 
 function set_default_priors_for_variance_components(mme,df)
-  myvar     = [var(filter(isfinite,skipmissing(df[!,mme.lhsVec[i]]))) for i=1:size(mme.lhsVec,1)]
+  # Use Julia's default unbiased sample variance (ddof=1) explicitly for clarity/parity.
+  myvar     = [var(filter(isfinite, skipmissing(df[!, mme.lhsVec[i]])); corrected=true) for i=1:size(mme.lhsVec,1)]
   phenovar  = diagm(0=>myvar)
   h2        = 0.5
 
