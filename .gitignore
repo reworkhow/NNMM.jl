@@ -38,6 +38,8 @@ dev_workspace/
 benchmarks/*.csv
 benchmarks/*.txt
 benchmarks/results/
+benchmarks/.mplconfig/
+benchmarks/.cache/
 
 # Coverage
 lcov.info

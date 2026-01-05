@@ -188,6 +188,11 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         if nonlinear_function != false
             outfile["EPV_NonLinear"] = open(output_folder*"/MCMC_samples_EPV_NonLinear.txt","w")
             println("The file "*output_folder*"/MCMC_samples_EPV_NonLinear.txt is created to save MCMC samples for EPV_NonLinear.")
+            # EPV on output IDs (e.g., test individuals whose phenotypes are missing)
+            if mme1.output_ID != 0
+                outfile["EPV_Output_NonLinear"] = open(output_folder*"/MCMC_samples_EPV_Output_NonLinear.txt","w")
+                println("The file "*output_folder*"/MCMC_samples_EPV_Output_NonLinear.txt is created to save MCMC samples for EPV_Output_NonLinear.")
+            end
         end
     end
     ############################################################################
@@ -342,6 +347,9 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
     if output_samples_frequency != 0 && nonlinear_function != false && mme2.M != 0 && length(mme2.M) > 0
         epv_ids = mme2.M[1].aligned_obsID_w_phenotype
         writedlm(outfile["EPV_NonLinear"], transubstrarr(epv_ids), ',')
+        if mme1.output_ID != 0 && haskey(outfile, "EPV_Output_NonLinear")
+            writedlm(outfile["EPV_Output_NonLinear"], transubstrarr(mme1.output_ID), ',')
+        end
     end
 
     @showprogress "running MCMC ..." for iter=1:chain_length
@@ -539,47 +547,78 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         μ_ylats       = reshape(μ_ylats,nobs,ntraits)
         ycorr_reshape        = reshape(ycorr1,nobs,ntraits)
     
-        #sample latent trait
-        incomplete_omics = mme1.incomplete_omics #indicator for ind with incomplete omics
+        #sample latent traits (omics) only where omics are incomplete
+        incomplete_omics = mme1.incomplete_omics #indicator for ind with no/partial omics
         if sum(incomplete_omics) != 0   #at least 1 ind with incomplete omics
-            if mme1.is_activation_fcn == true #Neural Network with activation function
-	                #step 1. sample latent trait (only for individuals with incomplete omics data
-	                Z  = map(mme1.MCMCinfo.double_precision ? Float64 : Float32,
-	                         mkmat_incidence_factor(mme2.obsID,mme2.M[1].obsID))
-	                ylats_new = hmc_one_iteration(10,0.1,ylats_old[incomplete_omics,:],yobs[incomplete_omics],mme1.weights_NN,mme1.R.val,σ2_yobs,ycorr_reshape[incomplete_omics,:],nonlinear_function,ycorr2[BitVector(Z*incomplete_omics)])
-	            else  #user-defined function, MH
-	                # Independent MH proposal for only the individuals with incomplete omics.
-	                # We propose from the (layer 1->2) conditional normal model and accept/reject
-	                # using only the phenotype likelihood term.
-	                ylats_old_inc = ylats_old[incomplete_omics,:]
-	                μ_ylats_inc   = μ_ylats[incomplete_omics,:]
-	                yobs_inc      = yobs[incomplete_omics]
-	                ninc          = size(ylats_old_inc, 1)
+            # HMC/MH uses the phenotype likelihood term, so restrict it to inds with observed yobs.
+            has_yobs = .!ismissing.(yobs)
+            incomplete_with_yobs = incomplete_omics .& has_yobs
+            incomplete_no_yobs   = incomplete_omics .& .!has_yobs
 
-	                if mme1.R.val isa Number
-	                    candidates = μ_ylats_inc .+ randn(ninc, ntraits) .* sqrt(mme1.R.val)
-	                else
-	                    L = cholesky(Symmetric(mme1.R.val)).L
-	                    candidates = μ_ylats_inc .+ randn(ninc, ntraits) * L'
-	                end
-	                if nonlinear_function == "Neural Network (MH)"
-	                    error("not supported for now")
-	                    μ_yobs_candidate = [ones(nobs) nonlinear_function.(candidates)]*weights
-	                    μ_yobs_current   = X*weights
-	                else #user-defined non-linear function
-	                    μ_yobs_candidate = nonlinear_function.(Tuple([view(candidates,:,i) for i in 1:ntraits])...)
-	                    μ_yobs_current   = nonlinear_function.(Tuple([view(ylats_old_inc,:,i) for i in 1:ntraits])...)
-	                end
-	                llh_current      = -0.5*(yobs_inc .- μ_yobs_current ).^2/σ2_yobs
-	                llh_candidate    = -0.5*(yobs_inc .- μ_yobs_candidate).^2/σ2_yobs
-	                mhRatio          = exp.(llh_candidate - llh_current)
-	                updateus         = rand(ninc) .< mhRatio
-	                ylats_new        = candidates.*updateus + ylats_old_inc.*(.!updateus)
-	            end
+            if any(incomplete_with_yobs)
+                if mme1.is_activation_fcn == true #Neural Network with activation function (incl. linear)
+                    #step 1. sample latent traits for incomplete inds with observed yobs
+                    Z = map(mme1.MCMCinfo.double_precision ? Float64 : Float32,
+                            mkmat_incidence_factor(mme2.obsID, mme2.M[1].obsID))
+                    ycorr2_sel = BitVector(Z * incomplete_with_yobs)
+                    ylats_new = hmc_one_iteration(10, 0.1,
+                                                 ylats_old[incomplete_with_yobs, :],
+                                                 yobs[incomplete_with_yobs],
+                                                 mme1.weights_NN, mme1.R.val, σ2_yobs,
+                                                 ycorr_reshape[incomplete_with_yobs, :],
+                                                 nonlinear_function,
+                                                 ycorr2[ycorr2_sel])
+                else  # user-defined function, MH (phenotype likelihood only)
+                    ylats_old_inc = ylats_old[incomplete_with_yobs, :]
+                    μ_ylats_inc   = μ_ylats[incomplete_with_yobs, :]
+                    yobs_inc      = yobs[incomplete_with_yobs]
+                    ninc          = size(ylats_old_inc, 1)
 
-	            #step 2. update ylats with sampled latent traits
-	            ylats_old[incomplete_omics,:] = ylats_new
-	        end
+                    T = eltype(μ_ylats_inc)
+                    if mme1.R.val isa Number
+                        candidates = μ_ylats_inc .+ randn(T, ninc, ntraits) .* sqrt(T(mme1.R.val))
+                    elseif mme1.R.val isa Diagonal
+                        sds = sqrt.(diag(mme1.R.val))
+                        candidates = μ_ylats_inc .+ randn(T, ninc, ntraits) .* reshape(T.(sds), 1, :)
+                    else
+                        L = cholesky(Symmetric(mme1.R.val)).L
+                        candidates = μ_ylats_inc .+ randn(T, ninc, ntraits) * L'
+                    end
+
+                    if nonlinear_function == "Neural Network (MH)"
+                        error("not supported for now")
+                    else # user-defined non-linear function
+                        μ_yobs_candidate = nonlinear_function.(Tuple([view(candidates, :, i) for i in 1:ntraits])...)
+                        μ_yobs_current   = nonlinear_function.(Tuple([view(ylats_old_inc, :, i) for i in 1:ntraits])...)
+                    end
+                    llh_current   = -0.5 * (yobs_inc .- μ_yobs_current).^2 / σ2_yobs
+                    llh_candidate = -0.5 * (yobs_inc .- μ_yobs_candidate).^2 / σ2_yobs
+                    mhRatio       = exp.(llh_candidate - llh_current)
+                    updateus      = rand(ninc) .< mhRatio
+                    ylats_new     = candidates .* updateus + ylats_old_inc .* (.!updateus)
+                end
+
+                #step 2. update ylats with sampled latent traits
+                ylats_old[incomplete_with_yobs, :] = ylats_new
+            end
+
+            # For incomplete inds without yobs, sample from the 1->2 conditional normal model only.
+            if any(incomplete_no_yobs)
+                μ_ylats_inc = μ_ylats[incomplete_no_yobs, :]
+                ninc = size(μ_ylats_inc, 1)
+                T = eltype(μ_ylats_inc)
+                if mme1.R.val isa Number
+                    candidates = μ_ylats_inc .+ randn(T, ninc, ntraits) .* sqrt(T(mme1.R.val))
+                elseif mme1.R.val isa Diagonal
+                    sds = sqrt.(diag(mme1.R.val))
+                    candidates = μ_ylats_inc .+ randn(T, ninc, ntraits) .* reshape(T.(sds), 1, :)
+                else
+                    L = cholesky(Symmetric(mme1.R.val)).L
+                    candidates = μ_ylats_inc .+ randn(T, ninc, ntraits) * L'
+                end
+                ylats_old[incomplete_no_yobs, :] = candidates
+            end
+        end
         
         #step 3. for individuals with partial omics data, put back the partial real omics.
         ylats_old[mme1.missingPattern] .= ylats_old2[mme1.missingPattern]
@@ -839,6 +878,26 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
                     EPV_NN = mme1.nonlinear_function.(Tuple([view(observed_omics,:,i) for i in 1:size(observed_omics,2)])...)
                 end
                 writedlm(outfile["EPV_NonLinear"], EPV_NN', ',')
+            end
+
+            # Save EPV on output IDs (includes test individuals even if phenotype is missing).
+            if mme1.output_ID != 0 && haskey(outfile, "EPV_Output_NonLinear")
+                # `ylats_old` is the current latent/observed omics matrix in mme1.obsID order.
+                # Align to mme1.output_ID order if needed, then compute EPV under the same
+                # nonlinearity settings used by EBV_NonLinear.
+                omics_out = ylats_old
+                if mme1.output_ID != mme1.obsID
+                    Zout = map(mme1.MCMCinfo.double_precision ? Float64 : Float32,
+                               mkmat_incidence_factor(mme1.output_ID, mme1.obsID))
+                    omics_out = Zout * omics_out
+                end
+                if mme1.is_activation_fcn == true
+                    omics_out = nonlinear_function.(omics_out)
+                    EPV_out = omics_out * mme1.weights_NN
+                else
+                    EPV_out = mme1.nonlinear_function.(Tuple([view(omics_out, :, i) for i in 1:size(omics_out, 2)])...)
+                end
+                writedlm(outfile["EPV_Output_NonLinear"], EPV_out', ',')
             end
         end
         ########################################################################

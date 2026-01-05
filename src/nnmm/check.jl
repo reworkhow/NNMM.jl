@@ -200,7 +200,8 @@ function nnlmm_initialize_missing_with_mean(mme,df)
             else #all omics i are missing
                 #if yobs[j] is missing, remove the row from df
                 if ismissing(mme.yobs[j])
-                    error("this individual has no omics data and no phenotype data: $(df[j,:ID]), please remove this individual.")
+                    # Allow individuals with no phenotype and no omics: initialize at 0.0 and let MCMC update from the 1->2 model.
+                    df[j,i]=0.0
                 else
                     df[j,i]=mme.yobs[j]
                 end

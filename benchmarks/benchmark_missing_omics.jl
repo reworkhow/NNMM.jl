@@ -28,11 +28,32 @@ println("=" ^ 70)
 println("Date: ", Dates.now())
 println()
 
-# Configuration
-const SEED = 42
-const CHAIN_LENGTH = 1000
-const BURNIN = 200
-const MISSING_PERCENTAGES = [0.0, 0.3, 0.5]  # 0%, 30%, 50% missing
+# Configuration (override via CLI args)
+function get_arg(flag, default)
+    for i in 1:length(ARGS)
+        arg = ARGS[i]
+        if arg == flag && i < length(ARGS)
+            return ARGS[i + 1]
+        elseif startswith(arg, flag * "=")
+            return split(arg, "=", limit=2)[2]
+        end
+    end
+    return default
+end
+
+function parse_csv_floats(val)
+    parts = split(String(val), ",")
+    return [parse(Float64, strip(p)) for p in parts if !isempty(strip(p))]
+end
+
+const SEED = parse(Int, get_arg("--seed", "42"))
+const CHAIN_LENGTH = parse(Int, get_arg("--chain-length", "1000"))
+const BURNIN = parse(Int, get_arg("--burnin", "200"))
+const MISSING_PERCENTAGES = parse_csv_floats(get_arg("--missing-pcts", "0.0,0.3,0.5"))
+# Missingness mode:
+# - individual (default): select a fraction of individuals and set ALL omics missing for them
+# - cell: original behavior (per-column missing); note this makes almost all individuals incomplete for large pcts
+const MISSING_MODE = lowercase(String(get_arg("--missing-mode", "individual")))
 
 # Load simulated dataset
 println("Loading simulated dataset...")
@@ -75,25 +96,32 @@ for missing_pct in MISSING_PERCENTAGES
     omics_cols = vcat([:ID], [Symbol("omic$i") for i in 1:n_omics])
     omics_df = copy(pheno_df[:, omics_cols])
     
-    # Introduce missing values randomly
-    n_missing_cells = 0
-    if missing_pct > 0
-        # Allow missing values in omics columns
-        for col in [Symbol("omic$i") for i in 1:n_omics]
-            allowmissing!(omics_df, col)
-        end
-        
-        for col in [Symbol("omic$i") for i in 1:n_omics]
-            # For each omics column, randomly set some values to missing
-            n_to_miss = round(Int, n_individuals * missing_pct)
-            miss_idx = sample(1:n_individuals, n_to_miss, replace=false)
-            omics_df[miss_idx, col] .= missing
-            n_missing_cells += n_to_miss
-        end
-        println("  Introduced $n_missing_cells missing cells ($(n_omics) omics × $(round(Int, n_individuals * missing_pct)) individuals)")
-    else
-        println("  No missing data (baseline)")
-    end
+	    # Introduce missing values randomly
+	    n_missing_cells = 0
+	    if missing_pct > 0
+	        allowmissing!(omics_df, Not(:ID))
+
+	        n_to_miss = round(Int, n_individuals * missing_pct)
+	        if MISSING_MODE == "cell"
+	            for col in [Symbol("omic$i") for i in 1:n_omics]
+	                miss_idx = sample(1:n_individuals, n_to_miss, replace=false)
+	                omics_df[miss_idx, col] .= missing
+	                n_missing_cells += n_to_miss
+	            end
+	            println("  Missing mode: cell (per-column)")
+	            println("  Introduced $n_missing_cells missing cells ($(n_omics) omics × $n_to_miss individuals per omic)")
+	        else
+	            miss_idx = sample(1:n_individuals, n_to_miss, replace=false)
+	            for col in [Symbol("omic$i") for i in 1:n_omics]
+	                omics_df[miss_idx, col] .= missing
+	            end
+	            n_missing_cells = n_to_miss * n_omics
+	            println("  Missing mode: individual (whole-omics missing)")
+	            println("  Introduced $n_missing_cells missing cells ($(n_omics) omics × $n_to_miss individuals)")
+	        end
+	    else
+	        println("  No missing data (baseline)")
+	    end
     
     omics_path = joinpath(benchmark_dir, "omics.csv")
     CSV.write(omics_path, omics_df; missingstring="NA")
@@ -130,7 +158,7 @@ for missing_pct in MISSING_PERCENTAGES
     ]
     
     # Run NNMM
-    println("  Running MCMC (chain_length=$CHAIN_LENGTH, burnin=$BURNIN)...")
+	    println("  Running MCMC (chain_length=$CHAIN_LENGTH, burnin=$BURNIN)...")
     result = runNNMM(layers, equations;
         chain_length=CHAIN_LENGTH,
         burnin=BURNIN,
@@ -256,4 +284,3 @@ println()
 println("PyNNMM should show similar accuracy patterns with missing data.")
 println("Key: NNMM uses HMC to impute missing omics values during MCMC.")
 println()
-

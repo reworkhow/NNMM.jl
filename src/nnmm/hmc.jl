@@ -36,12 +36,34 @@ Author: NNMM.jl Team
 =#
 
 
+# Fast elementwise activation derivative for built-in activations (avoids ForwardDiff).
+function activation_derivative(activation_function, x)
+    fname = string(nameof(typeof(activation_function)))
+    T = eltype(x)
+
+    if occursin("mylinear", fname)
+        return fill(one(T), size(x))
+    elseif occursin("mytanh", fname)
+        y = activation_function.(x)
+        return one(T) .- y .^ 2
+    elseif occursin("mysigmoid", fname)
+        y = activation_function.(x)
+        return y .* (one(T) .- y)
+    elseif occursin("myrelu", fname)
+        return ifelse.(x .> zero(T), one(T), zero(T))
+    elseif occursin("myleakyrelu", fname)
+        return ifelse.(x .> zero(T), one(T), T(0.01))
+    else
+        return ForwardDiff.derivative.(activation_function, x)
+    end
+end
+
 #helper 1: calculate gradiant of all latent traits for all individual
 function calc_gradient_z(ylats,yobs,weights_NN,σ_ylats,σ_yobs,ycorr,activation_function,ycorr_yobs) #ycorr is 1->2, ycorr_yobs is 2->3
     # μ1, w1     = weights_NN[1], weights_NN[2:end]
     w1 = weights_NN
     # g_ylats = activation_function.(ylats)
-    g_ylats_derivative = ForwardDiff.derivative.(activation_function, ylats)
+    g_ylats_derivative = activation_derivative(activation_function, ylats)
     dlogf_ylats    = -ycorr / σ_ylats
     # dlogfy         = ((yobs .- μ1 - g_ylats*w1)/σ_yobs) * w1' .* g_ylats_derivative #size: (n, l1)
     dlogfy         = (ycorr_yobs/σ_yobs) * w1' .* g_ylats_derivative #size: (n, l1)
@@ -71,6 +93,7 @@ function hmc_one_iteration(nLeapfrog,ϵ,ylats_old,yobs,weights_NN,σ_ylats,σ_yo
     nobs, ntraits  = size(ylats_old)
     ylats_old = copy(ylats_old)
     ylats_new = copy(ylats_old)
+    is_linear_activation = occursin("mylinear", string(nameof(typeof(activation_function))))
 
     #step 1: Initiate Φ from N(0,M)
     Φ = randn(nobs, ntraits) #rand(n,Normal(0,M=1.0)), tuning parameter: M
@@ -83,7 +106,11 @@ function hmc_one_iteration(nLeapfrog,ϵ,ylats_old,yobs,weights_NN,σ_ylats,σ_yo
        ylats_tmp = copy(ylats_new) #ylat before update
        ylats_new += ϵ * Φ  # (n,l1)
        ycorr     += ϵ * Φ  #update ycorr due to change of Z
-       ycorr_yobs += (activation_function.(ylats_tmp)-activation_function.(ylats_new))*weights_NN #update ycorr_yobs due to change of Z
+       if is_linear_activation
+           ycorr_yobs += (ylats_tmp - ylats_new) * weights_NN
+       else
+           ycorr_yobs += (activation_function.(ylats_tmp)-activation_function.(ylats_new))*weights_NN #update ycorr_yobs due to change of Z
+       end
        #(c) half step of phi
        if leap_i == nLeapfrog
            #2(c): update Φ

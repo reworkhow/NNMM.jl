@@ -194,6 +194,19 @@ function output_result(mme,output_folder,
               # EPV has IDs for phenotyped individuals (may be different from all individuals)
               output["EPV_NonLinear"] = DataFrame([vec(EPV_IDs) EPV_mean EPV_var],[:ID,:EPV,:PEV])
           end
+
+          # EPV on output IDs (includes test individuals with missing phenotypes).
+          EPVout_samplesfile = output_file*"_EPV_Output_NonLinear.txt"
+          if isfile(EPVout_samplesfile)
+              EPVout_samples,EPVout_IDs = readdlm(EPVout_samplesfile,',',header=true)
+              EPVout_mean = vec(mean(EPVout_samples,dims=1))
+              EPVout_var  = vec(var(EPVout_samples,dims=1))
+              if vec(EPVout_IDs) == mme.output_ID
+                  output["EPV_Output_NonLinear"] = DataFrame([mme.output_ID EPVout_mean EPVout_var],[:ID,:EPV,:PEV])
+              else
+                  error("The EPV output file is wrong.")
+              end
+          end
       end
       if mme.nonlinear_function != false && mme.is_activation_fcn == true  #Neural Network with activation function
           myvar         = "neural_networks_bias_and_weights"
