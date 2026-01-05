@@ -1,106 +1,257 @@
-# Mixed effect neural network: Genotypes -> (complete/incomplete) Intemediate omics features -> Phenotyes
+# Part 3: NNMM with Intermediate Omics Features
 
-Tips:
-* Put the names of omics features in the `build_model()` function through the `latent_traits` argument.
-* If there are many omics features (e.g., 1000), it is recommanded to set `printout_model_info=false` in the `runMCMC()` function.
-* Missing omics data for individuals in the training dataset (i.e., individuals with phenotypes) is allowed. When you read a file with missing values via the `CSV.read()` function, the `missingstrings` argument should be used to set sentinel values that will be parsed as `missing`.
-* For individuals in the testing dataset (i.e., individuals without phenotypes), if the testing individuals have complete omics data, then incorporating the omics data of those individuals may improve the relationship between input layer (genotype) and middle layer (omics).
+!!! note "Version Compatibility"
+    This documentation reflects **NNMM.jl v0.3+** using the `Layer`/`Equation`/`runNNMM` API.
 
+## Model Architecture
 
-## example(o1): fully-connected neural networks with observed intemediate omics features
-* nonlinear function (to define relationship between omics and phenotye): sigmoid (other supported activation functions: "tanh", "relu", "leakyrelu", "linear")
-* number of omics features in the middle layer: 10
-* Bayesian model: multiple independent single-trait BayesC (to sample marker effects on intemediate omics)
-* sample the missing omics in the middle layer: Hamiltonian Monte Carlo
+When you have observed intermediate omics data (e.g., gene expression, metabolomics), NNMM can incorporate them in the middle layer:
+
+```
+Genotypes → (Complete/Incomplete) Intermediate Omics → Phenotypes
+ (Layer 1)              (Layer 2)                       (Layer 3)
+```
+
+!!! tip "Key Points"
+    - Omics feature names are specified in the `omics_name` parameter of the first `Equation`
+    - Missing omics values are allowed and will be sampled via HMC
+    - Testing individuals (without phenotypes) can still contribute omics data to improve the genotype→omics model
+
+## Example: Fully-Connected Network with Observed Omics
+
+This example demonstrates:
+- **Activation function**: `sigmoid` (other options: `"tanh"`, `"relu"`, `"leakyrelu"`, `"linear"`)
+- **Number of omics features**: 10
+- **Bayesian model**: BayesC for marker effects
+- **Missing omics handling**: Hamiltonian Monte Carlo
 
 ![](https://github.com/zhaotianjing/figures/blob/main/part3_example.png?raw=true)
 
 ```julia
 # Step 1: Load packages
-using NNMM,DataFrames,CSV,Statistics,NNMM.Datasets, Random, HTTP #HTTP to download demo data from github
+using NNMM
+using NNMM.Datasets
+using DataFrames
+using CSV
+using Statistics
+using Random
+
 Random.seed!(123)
 
-# Step 2: Read data (from github)
-phenofile  = HTTP.get("https://raw.githubusercontent.com/zhaotianjing/nnmm_doc/main/data_simulation/y.csv").body
-omicsfile  = HTTP.get("https://raw.githubusercontent.com/zhaotianjing/nnmm_doc/main/data_simulation/omics.csv").body
-genofile   = HTTP.get("https://raw.githubusercontent.com/zhaotianjing/nnmm_doc/main/data_simulation/geno_n100_p200.csv").body
-phenotypes = CSV.read(phenofile,DataFrame)
-omics      = CSV.read(omicsfile,DataFrame)
-geno_df    = CSV.read(genofile,DataFrame)
+# Step 2: Load simulated dataset
+geno_path = Datasets.dataset("genotypes_1000snps.txt", dataset_name="simulated_omics_data")
+pheno_path = Datasets.dataset("phenotypes_sim.txt", dataset_name="simulated_omics_data")
 
-omics_names = names(omics)[2:end]  #get names of omics
-insertcols!(omics,2,:y => phenotypes[:,:y], :bv => phenotypes[:,:bv]) #phenotype and omics should be in the same dataframe
+# Read data
+pheno_df = CSV.read(pheno_path, DataFrame)
 
-genotypes = get_genotypes(geno_df,separator=',',method="BayesC")
+# Step 3: Prepare omics file (Layer 2)
+# Select ID and 10 omics features
+omics_cols = vcat(:ID, [Symbol("omic$i") for i in 1:10])
+omics_df = pheno_df[:, omics_cols]
+omics_names = names(omics_df)[2:end]  # ["omic1", "omic2", ..., "omic10"]
 
-# Step 3: Build Model Equations
-model_equation  ="y = intercept + genotypes" #name of phenotypes is "y"
-                                             #name of genotypes is "genotypes" (user-defined in the previous step)
-                                             #the single-trait mixed model used between input and each omics is: omics = intercept + genotypes
-model = build_model(model_equation,
-		    num_hidden_nodes=10,          #number of omics in middle layer is 3
-                    latent_traits=omics_names,    #name of all omics
-		    nonlinear_function="sigmoid") #sigmoid function is used to approximate relationship between omics and phenotypes
+omics_file = "omics_data.csv"
+CSV.write(omics_file, omics_df; missingstring="NA")
 
-# Step 4: Run Analysis
-out=runMCMC(model, omics, chain_length=5000, printout_model_info=false);
+# Step 4: Prepare phenotype file (Layer 3)
+trait_df = pheno_df[:, [:ID, :trait1]]
+trait_file = "phenotypes_data.csv"
+CSV.write(trait_file, trait_df; missingstring="NA")
 
-# Step 5: Check Accuruacy
-results    = innerjoin(out["EBV_NonLinear"], omics, on = :ID)
-accuruacy  = cor(results[!,:EBV],results[!,:bv])
+# Step 5: Define layers
+layers = [
+    # Layer 1: Genotypes
+    Layer(
+        layer_name = "genotypes",
+        data_path = [geno_path]
+    ),
+    # Layer 2: Omics (with observed values)
+    Layer(
+        layer_name = "omics",
+        data_path = omics_file,
+        missing_value = "NA"
+    ),
+    # Layer 3: Phenotypes
+    Layer(
+        layer_name = "phenotypes",
+        data_path = trait_file,
+        missing_value = "NA"
+    )
+]
+
+# Step 6: Define equations
+equations = [
+    # Genotypes → Omics (BayesC)
+    Equation(
+        from_layer_name = "genotypes",
+        to_layer_name = "omics",
+        equation = "omics = intercept + genotypes",
+        omics_name = omics_names,  # Names of omics columns
+        method = "BayesC",
+        estimatePi = true
+    ),
+    # Omics → Phenotypes (sigmoid activation)
+    Equation(
+        from_layer_name = "omics",
+        to_layer_name = "phenotypes",
+        equation = "phenotypes = intercept + omics",
+        phenotype_name = ["trait1"],
+        method = "BayesC",
+        activation_function = "sigmoid"
+    )
+]
+
+# Step 7: Run analysis
+out = runNNMM(layers, equations;
+    chain_length = 5000,
+    burnin = 1000,
+    printout_frequency = 2000,  # Print every 2000 iterations
+    output_folder = "nnmm_omics_results"
+)
+
+# Step 8: Check accuracy
+ebv = out["EBV_NonLinear"]
+
+# Convert ID types for joining (EBV IDs may be of type Any)
+ebv.ID = string.(ebv.ID)
+pheno_df.ID = string.(pheno_df.ID)
+
+# If true breeding values available:
+if hasproperty(pheno_df, :genetic_total)
+    results = innerjoin(ebv, pheno_df[:, [:ID, :genetic_total]], on=:ID)
+    accuracy = cor(Float64.(results.EBV), results.genetic_total)
+    println("Prediction accuracy: ", round(accuracy, digits=4))
+end
+
+# Cleanup
+rm(omics_file, force=true)
+rm(trait_file, force=true)
 ```
 
+## Including Residual Polygenic Effects
 
-
-
-## Includes a residual that is not mediated by other omics features
-To include residuals polygenic component (i.e. directly from genotypes to phenotypes, not mediated by omics features), you can additional hidden nodes in the middle layer (see example (o2)). This can also be achieved in a partial-connected neural network in a same manner.
+To include a residual polygenic component (genetic effects not mediated by omics), add an extra latent node to the middle layer:
 
 ![](https://github.com/zhaotianjing/figures/blob/main/wiki_omics_residual.png?raw=true)
 
-### example(o2): fully-connected neural network with residuals
-
-For all individuals, this extra hidden node will be treated as unknown to be sampled.
+### Example: Network with Residual Polygenic Effect
 
 ```julia
 # Step 1: Load packages
-using NNMM,DataFrames,CSV,Statistics,NNMM.Datasets, Random, HTTP 
+using NNMM
+using NNMM.Datasets
+using DataFrames
+using CSV
+using Statistics
+using Random
+
 Random.seed!(123)
 
-# Step 2: Read data (from github)
-phenofile  = HTTP.get("https://raw.githubusercontent.com/zhaotianjing/nnmm_doc/main/data_simulation/y.csv").body
-omicsfile  = HTTP.get("https://raw.githubusercontent.com/zhaotianjing/nnmm_doc/main/data_simulation/omics.csv").body
-genofile   = HTTP.get("https://raw.githubusercontent.com/zhaotianjing/nnmm_doc/main/data_simulation/geno_n100_p200.csv").body
-phenotypes = CSV.read(phenofile,DataFrame)
-omics      = CSV.read(omicsfile,DataFrame)
-geno_df    = CSV.read(genofile,DataFrame)
+# Step 2: Load data
+geno_path = Datasets.dataset("genotypes_1000snps.txt", dataset_name="simulated_omics_data")
+pheno_path = Datasets.dataset("phenotypes_sim.txt", dataset_name="simulated_omics_data")
+pheno_df = CSV.read(pheno_path, DataFrame)
 
-insertcols!(omics, :residual => missing)  #create a hidden node to account for residuals
-omics[!,:residual] = convert(Vector{Union{Missing,Float64}}, omics[!,:residual]) #transform the datatype is required for Julia
-omics_names = names(omics)[2:end]  #get names of 10 omics and 1 hidden node
-insertcols!(omics,2,:y => phenotypes[:,:y], :bv => phenotypes[:,:bv]) #phenotype and omics should be in the same dataframe
+# Step 3: Create omics file WITH an extra "residual" column (all missing)
+omics_cols = vcat(:ID, [Symbol("omic$i") for i in 1:10])
+omics_df = pheno_df[:, omics_cols]
 
-genotypes = get_genotypes(geno_df,separator=',',method="BayesC")
+# Add residual column (all missing - will be sampled)
+omics_df[!, :residual] = fill(missing, nrow(omics_df))
 
-# Step 3: Build Model Equations
-model_equation  ="y = intercept + genotypes" 
-model = build_model(model_equation,
-		    num_hidden_nodes=11,   #10 omcis and 1 hidden node
-                    latent_traits=omics_names,
-		    nonlinear_function="sigmoid")
+omics_names = names(omics_df)[2:end]  # ["omic1", ..., "omic10", "residual"]
 
-# Step 4: Run Analysis
-out = runMCMC(model,omics,chain_length=5000,printout_model_info=false)
+omics_file = "omics_with_residual.csv"
+CSV.write(omics_file, omics_df; missingstring="NA")
 
-# Step 5: Check Accuruacy
-results    = innerjoin(out["EBV_NonLinear"], omics, on = :ID)
-accuruacy  = cor(results[!,:EBV],results[!,:bv])
+# Step 4: Create phenotype file
+trait_df = pheno_df[:, [:ID, :trait1]]
+trait_file = "phenotypes_data.csv"
+CSV.write(trait_file, trait_df; missingstring="NA")
+
+# Step 5: Define layers
+layers = [
+    Layer(layer_name = "genotypes", data_path = [geno_path]),
+    Layer(layer_name = "omics", data_path = omics_file, missing_value = "NA"),
+    Layer(layer_name = "phenotypes", data_path = trait_file, missing_value = "NA")
+]
+
+# Step 6: Define equations (11 features: 10 omics + 1 residual)
+equations = [
+    Equation(
+        from_layer_name = "genotypes",
+        to_layer_name = "omics",
+        equation = "omics = intercept + genotypes",
+        omics_name = omics_names,  # Includes "residual"
+        method = "BayesC",
+        estimatePi = true
+    ),
+    Equation(
+        from_layer_name = "omics",
+        to_layer_name = "phenotypes",
+        equation = "phenotypes = intercept + omics",
+        phenotype_name = ["trait1"],
+        method = "BayesC",
+        activation_function = "sigmoid"
+    )
+]
+
+# Step 7: Run analysis
+out = runNNMM(layers, equations;
+    chain_length = 5000,
+    burnin = 1000,
+    output_folder = "nnmm_residual_results"
+)
+
+# Step 8: Check accuracy
+ebv = out["EBV_NonLinear"]
+
+# Convert ID types for joining
+ebv.ID = string.(ebv.ID)
+pheno_df.ID = string.(pheno_df.ID)
+
+if hasproperty(pheno_df, :genetic_total)
+    results = innerjoin(ebv, pheno_df[:, [:ID, :genetic_total]], on=:ID)
+    accuracy = cor(Float64.(results.EBV), results.genetic_total)
+    println("Prediction accuracy: ", round(accuracy, digits=4))
+end
+
+# Cleanup
+rm(omics_file, force=true)
+rm(trait_file, force=true)
 ```
 
-Users can also add extra hidden nodes in the partial-connected neural network. Please check next documentation for building a partial-connected neural network.
+## Handling Missing Omics Data
 
-## Output files
-Same as those described in Part2.
+NNMM automatically handles missing omics values in the training set. Missing values are sampled using HMC based on:
+1. The upstream genotype layer (marker effects)
+2. The downstream phenotype layer (via backpropagation)
 
-### Julia Tips:
-* You may want to set missing values manually, for example, setting the phenotypes for individuals in testing dataset as `missing`. Firstly, the type of  columns should be changed to allow `missing`, e.g., `phenotypes[!,:y] =  convert(Vector{Union{Missing,Float64}}, phenotypes[!,:y])`. Then, `missing` can be set manually, e.g., `phenotypes[10:11,:y1] .= missing` forces the 10th and 11th elements to be `missing`.
+### Setting Missing Values Manually
+
+```julia
+# Convert column type to allow missing values
+omics_df[!, :omic1] = convert(Vector{Union{Missing, Float64}}, omics_df[!, :omic1])
+
+# Set specific values to missing
+omics_df[10:15, :omic1] .= missing  # Set rows 10-15 as missing for omic1
+
+# Set phenotypes for testing individuals as missing
+pheno_df[!, :trait1] = convert(Vector{Union{Missing, Float64}}, pheno_df[!, :trait1])
+pheno_df[90:100, :trait1] .= missing  # Testing individuals
+```
+
+## Output Files
+
+The output files are the same as described in [Part 2](Part2_NNMM.md), with omics names replacing latent node names.
+
+## Tips
+
+1. **Many omics features**: For large numbers of omics (>100), set `printout_frequency` to a large value to reduce console output.
+
+2. **Pre-processing**: Center and scale omics data before running NNMM for better convergence.
+
+3. **Testing individuals**: Include individuals without phenotypes if they have omics data - this improves the genotype→omics model.
+
+4. **Residual effects**: Add a completely missing "residual" column to capture genetic variance not explained by omics.

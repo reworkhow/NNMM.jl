@@ -1,82 +1,221 @@
- # Mixed effect neural network: Genotypes -> Unobserved intemediate traits -> Phenotyes
- 
- Tips: please center the phenotypes to have zero mean.
- 
- ## Example(a): fully-connected neural networks, all intemediate traits are unobserved
-- nonlinear function (to define relationship between middle layer and phenotye): tanh (other supported activation functions: "sigmoid", "relu", "leakyrelu", "linear")
-- number of nodes in the middle layer: 3
-- Bayesian model: multiple independent single-trait BayesC (to sample marker effects on intemediate traits). Note, to use multi-trait Bayesian Alphabet models, please set `mega_trait=false` in `runMCMC()` function.
-- sample the unobserved intemediate traits in the middle layer: Hamiltonian Monte Carlo
+# Part 2: Mixed Effect Neural Network (NNMM)
+
+!!! note "Version Compatibility"
+    This documentation reflects **NNMM.jl v0.3+** using the `Layer`/`Equation`/`runNNMM` API.
+
+## Model Architecture
+
+NNMM extends traditional genomic prediction by adding an intermediate layer:
+
+```
+Genotypes → Unobserved Intermediate Traits → Phenotypes
+ (Layer 1)         (Layer 2)                 (Layer 3)
+```
+
+When the intermediate traits are unobserved (latent), they are sampled via Hamiltonian Monte Carlo (HMC).
+
+!!! tip "Data Preparation"
+    It is recommended to center the phenotypes to have zero mean before running NNMM.
+
+!!! important "Data Requirements"
+    Genotype and phenotype files must have matching individual IDs. This example uses the 
+    `simulated_omics_data` dataset which has 3534 aligned individuals.
+
+## Example: Fully-Connected Neural Network with Unobserved Latent Traits
+
+This example demonstrates:
+- **Activation function**: `tanh` (other options: `"sigmoid"`, `"relu"`, `"leakyrelu"`, `"linear"`)
+- **Number of latent nodes**: 3 (unobserved intermediate traits)
+- **Bayesian model**: BayesC (multiple independent single-trait models for marker effects)
+- **Latent trait sampling**: Hamiltonian Monte Carlo
 
 ![](https://github.com/zhaotianjing/figures/blob/main/part2_example.png?raw=true)
 
 ```julia
 # Step 1: Load packages
-using NNMM,DataFrames,CSV,Statistics,NNMM.Datasets,Random
+using NNMM
+using NNMM.Datasets
+using DataFrames
+using CSV
+using Statistics
+using Random
+
 Random.seed!(123)
 
-# Step 2: Read data 
-phenofile  = dataset("phenotypes.csv") #get example data path
-genofile   = dataset("genotypes.csv")  #get example data path
+# Step 2: Read data (using simulated_omics_data with aligned individuals)
+geno_path = Datasets.dataset("genotypes_1000snps.txt", dataset_name="simulated_omics_data")
+pheno_path = Datasets.dataset("phenotypes_sim.txt", dataset_name="simulated_omics_data")
 
-phenotypes = CSV.read(phenofile,DataFrame,delim = ',',header=true,missingstrings=["NA"]) #read phenotypes (output layer)
-genotypes  = get_genotypes(genofile,separator=',',method="BayesC");                      #read genotypes  (input layer)
+# Read phenotypes (output layer)
+phenotypes = CSV.read(pheno_path, DataFrame)
 
+# Step 3: Create latent trait file (all values missing)
+# When no omics data is observed, create a file with all missing values
+# NNMM will sample these latent traits via HMC
+n_individuals = nrow(phenotypes)
+n_latent = 3  # Number of latent nodes in middle layer
 
-# Step 3: Build Model Equations 
-model_equation  ="y1 = intercept + genotypes"  #name of phenotypes is "y1" in the phenotypes data
-                                               #name of genotypes is "genotypes" (user-defined in the previous step)
-                                               #the single-trait mixed model used between input and each node in middle layer is: middle node = intercept + genotypes
-model = build_model(model_equation,
-		    num_hidden_nodes=3,            #number of nodes in middle layer is 3
-		    nonlinear_function="tanh");    #tanh function is used to approximate relationship between middle layer and phenotype
+latent_df = DataFrame(ID = phenotypes.ID)
+for i in 1:n_latent
+    latent_df[!, Symbol("latent$i")] = fill(missing, n_individuals)
+end
 
+# Write to file with "NA" as missing string
+latent_file = "latent_traits.csv"
+CSV.write(latent_file, latent_df; missingstring="NA")
 
-# Step 4: Run Analysis
-out=runMCMC(model,phenotypes,chain_length=5000); 
+# Step 4: Create phenotype file for Layer 3
+# Center phenotype for better convergence
+pheno_mean = mean(skipmissing(phenotypes.trait1))
+phenotypes.trait1_centered = phenotypes.trait1 .- pheno_mean
 
-# Step 5: Check Accuruacy
-results    = innerjoin(out["EBV_NonLinear"], phenotypes, on = :ID) 
-accuruacy  = cor(results[!,:EBV],results[!,:bv1])
+trait_file = "phenotypes_layer3.csv"
+trait_df = phenotypes[:, [:ID, :trait1_centered]]
+rename!(trait_df, :trait1_centered => :y1)
+CSV.write(trait_file, trait_df; missingstring="NA")
+
+# Step 5: Define layers
+layers = [
+    # Layer 1: Genotypes (input layer)
+    Layer(
+        layer_name = "genotypes",
+        data_path = [geno_path]
+    ),
+    # Layer 2: Latent traits (all missing, will be sampled via HMC)
+    Layer(
+        layer_name = "latent",
+        data_path = latent_file,
+        missing_value = "NA"
+    ),
+    # Layer 3: Phenotypes (output layer)
+    Layer(
+        layer_name = "phenotypes",
+        data_path = trait_file,
+        missing_value = "NA"
+    )
+]
+
+# Step 6: Define equations
+equations = [
+    # Genotypes → Latent traits (BayesC)
+    Equation(
+        from_layer_name = "genotypes",
+        to_layer_name = "latent",
+        equation = "latent = intercept + genotypes",
+        omics_name = ["latent1", "latent2", "latent3"],  # Names match CSV columns
+        method = "BayesC",
+        estimatePi = true
+    ),
+    # Latent traits → Phenotypes (with tanh activation)
+    Equation(
+        from_layer_name = "latent",
+        to_layer_name = "phenotypes",
+        equation = "phenotypes = intercept + latent",
+        phenotype_name = ["y1"],
+        method = "BayesC",
+        activation_function = "tanh"  # Nonlinear relationship
+    )
+]
+
+# Step 7: Run analysis
+out = runNNMM(layers, equations;
+    chain_length = 5000,
+    burnin = 1000,
+    output_folder = "nnmm_latent_results"
+)
+
+# Step 8: Check accuracy (simulated data has true breeding values)
+ebv = out["EBV_NonLinear"]
+
+# Convert to proper types and merge
+ebv.ID = string.(ebv.ID)
+phenotypes.ID = string.(phenotypes.ID)
+results = innerjoin(ebv, phenotypes[:, [:ID, :genetic_total]], on=:ID)
+accuracy = cor(Float64.(results.EBV), results.genetic_total)
+println("Prediction accuracy: ", round(accuracy, digits=4))
+
+# Cleanup temporary files
+rm(latent_file, force=true)
+rm(trait_file, force=true)
 ```
 
+## Output Files
 
-## Example output files
+When latent traits are named "latent1", "latent2", "latent3", the output files use these names directly.
 
-The i-th middle nodes will be named as "trait name"+"i". In our example, the observed trait is named "y1", and there are 3 middle nodes, so the middle nodes are named as "y11", "y12", and "y13", respectively.
+### Estimate Files (Posterior Means)
 
-Below is a list of files containing estimates and standard deviations for variables of interest. 
+| File Name | Description |
+|-----------|-------------|
+| `EBV_NonLinear.txt` | Estimated breeding values for observed phenotype |
+| `EBV_latent1.txt` | EBV for latent node 1 |
+| `EBV_latent2.txt` | EBV for latent node 2 |
+| `EBV_latent3.txt` | EBV for latent node 3 |
+| `genetic_variance.txt` | Genetic variance-covariance of all latent nodes |
+| `heritability.txt` | Heritability estimates for all latent nodes |
+| `location_parameters.txt` | Intercept estimates for all latent nodes |
+| `neural_networks_bias_and_weights.txt` | Bias and weights between latent nodes and phenotypes |
+| `pi_genotypes.txt` | Marker inclusion probability (π) for all latent nodes |
+| `marker_effects_genotypes.txt` | Marker effects for all latent nodes |
+| `residual_variance.txt` | Residual variance-covariance for all latent nodes |
 
-| file name      | description |
-| -----------    | ----------- |
-| EBV_NonLinear.txt | estimated breeding values for observed trait  |
-| EBV_y11.txt       | estimated breeding values for middle node 1      |
-| EBV_y12.txt       | estimated breeding values for middle node 2      |
-| EBV_y13.txt       | estimated breeding values for middle node 3      |
-|genetic_variance.txt                   | estimated genetic variance-covariance of all middle nodes |
-|heritability.txt                       | estimated heritability of all middle nodes                |
-|location_parameters.txt                | estimated bias of all middle nodes                        |
-|neural_networks_bias_and_weights.txt.  | estimated bias of phenotypes and weights between middle nodes and phenotypes|
-|pi_genotypes.txt                       | estimated pi of all middle nodes                          | 
-|marker_effects_genotypes.txt           | estimated marker effects of all middle nodes              |
-|residual_variance.txt                  | estimated residual variance-covariance for all middle nodes| 
+### MCMC Sample Files
 
-Below is a list of files containing MCMC samples for variables of interest. 
+| File Name | Description |
+|-----------|-------------|
+| `MCMC_samples_EBV_NonLinear.txt` | MCMC samples for phenotype breeding values |
+| `MCMC_samples_EBV_latent1.txt` | MCMC samples for latent node 1 EBV |
+| `MCMC_samples_EBV_latent2.txt` | MCMC samples for latent node 2 EBV |
+| `MCMC_samples_EBV_latent3.txt` | MCMC samples for latent node 3 EBV |
+| `MCMC_samples_genetic_variance.txt` | MCMC samples for genetic variance-covariance |
+| `MCMC_samples_heritability.txt` | MCMC samples for heritability |
+| `MCMC_samples_marker_effects_genotypes_latent1.txt` | Marker effect samples for latent node 1 |
+| `MCMC_samples_marker_effects_genotypes_latent2.txt` | Marker effect samples for latent node 2 |
+| `MCMC_samples_marker_effects_genotypes_latent3.txt` | Marker effect samples for latent node 3 |
+| `MCMC_samples_marker_effects_variances_genotypes.txt` | Marker effect variance samples |
+| `MCMC_samples_neural_networks_bias_and_weights.txt` | Neural network parameter samples |
+| `MCMC_samples_pi_genotypes.txt` | π samples for all latent nodes |
+| `MCMC_samples_residual_variance.txt` | Residual variance samples |
 
-| file name      | description |
-| -----------    | ----------- |
-| MCMC_samples_EBV_NonLinear.txt     | MCMC samples from the posterior distribution of breeding values for phenotypes  |
-| MCMC_samples_EBV_y11.txt     | MCMC samples from the posterior distribution of breeding values for middle node 1       |
-| MCMC_samples_EBV_y12.txt     | MCMC samples from the posterior distribution of breeding values for middle node 2       |
-| MCMC_samples_EBV_y13.txt     | MCMC samples from the posterior distribution of breeding values for middle node 3       |
-|MCMC_samples_genetic_variance.txt                   | MCMC samples from the posterior distribution of genetic variance-covariance for all middle nodes   |
-|MCMC_samples_heritability.txt                       | MCMC samples from the posterior distribution of heritability for all middle nodes                                | 
-|MCMC_samples_marker_effects_genotypes_y11            |MCMC samples from the posterior distribution of marker effects for middle node 1           |
-|MCMC_samples_marker_effects_genotypes_y12            |MCMC samples from the posterior distribution of marker effects for middle node 2           |
-|MCMC_samples_marker_effects_genotypes_y13            |MCMC samples from the posterior distribution of marker effects for middle node 3           |
-|MCMC_samples_marker_effects_variances_genotypes.txt | MCMC samples from the posterior distribution of marker effect variance for all middle nodes        |
-|MCMC_samples_neural_networks_bias_and_weights.txt.  | MCMC samples from the posterior distribution of bias of observed trait and weights between middle nodes and phenotypes|
-|MCMC_samples_pi_genotypes.txt                       | MCMC samples from the posterior distribution of pi for all middle nodes                                          |
-|MCMC_samples_residual_variance.txt                  |  MCMC samples from the posterior distribution of residual variance-covariance for all middle nodes |
+## Different Number of Latent Nodes
 
+The number of latent nodes is determined by the `omics_name` parameter in the first equation:
 
+```julia
+# For 5 latent nodes:
+omics_name = ["latent1", "latent2", "latent3", "latent4", "latent5"]
+
+# For 10 latent nodes:
+omics_name = ["latent$i" for i in 1:10]
+```
+
+## Different Activation Functions
+
+```julia
+# Linear (traditional regression)
+Equation(..., activation_function = "linear")
+
+# Sigmoid (outputs between 0 and 1)
+Equation(..., activation_function = "sigmoid")
+
+# Tanh (outputs between -1 and 1)
+Equation(..., activation_function = "tanh")
+
+# ReLU (sparse activation)
+Equation(..., activation_function = "relu")
+
+# Leaky ReLU (sparse with gradient flow)
+Equation(..., activation_function = "leakyrelu")
+```
+
+## Tips for Best Results
+
+1. **Center phenotypes**: Subtract the mean from phenotypes before running NNMM.
+
+2. **Choose number of latent nodes**: More nodes capture more variance but increase computational cost. Start with 3-5 nodes.
+
+3. **Chain length**: For production, use `chain_length=50000` or more. For testing, `chain_length=1000` is sufficient.
+
+4. **Convergence**: Check MCMC samples for convergence. If variance estimates are unstable, increase chain length.
+
+5. **Activation function**: Use `"linear"` for simple additive models, `"tanh"` or `"sigmoid"` for nonlinear relationships.
