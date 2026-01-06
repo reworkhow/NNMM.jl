@@ -73,6 +73,38 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         thread_rngs = [Random.MersenneTwister(mme1.MCMCinfo.seed + tid) for tid in 1:Threads.nthreads()]
     end
 
+    # Exclude "prediction-only" individuals from ALL parameter-updating steps.
+    #
+    # Definition (edge-case guard):
+    # - phenotype (yobs) is missing, AND
+    # - ALL hidden-layer nodes (omics / latent traits) were unobserved in the input data.
+    #
+    # Such individuals carry no likelihood information for 1->2 or 2->3 updates; including them can
+    # destabilize variance updates via degenerate residuals. We keep them for prediction, but set
+    # their weights to zero so they do not contribute to parameter updates.
+    if mme1.nonlinear_function != false && mme1.latent_traits != false
+        nobs = length(invweights1)
+        if length(mme1.yobs) == nobs && (mme1.missingPattern isa AbstractArray) && size(mme1.missingPattern, 1) == nobs
+            has_yobs = .!ismissing.(mme1.yobs)
+            has_any_hidden_obs = vec(sum(mme1.missingPattern, dims=2) .> 0)
+            prediction_only = (.!has_yobs) .& (.!has_any_hidden_obs)
+            n_excluded = count(prediction_only)
+            if n_excluded > 0
+                invweights1[prediction_only] .= zero(eltype(invweights1))
+                example_idx = findall(prediction_only)
+                example_ids = mme1.obsID[example_idx[1:min(end, 8)]]
+                printstyled(
+                    "NNMM: excluded $n_excluded individual(s) from parameter updates because they have missing phenotype ($(mme1.yobs_name)) and no observed hidden-layer data. These individuals will be treated as prediction-only.\n" *
+                    "      Example IDs: " * join(example_ids, ", ") * "\n",
+                    bold=false,
+                    color=:yellow,
+                )
+            end
+        else
+            @warn "NNMM prediction-only exclusion skipped due to unexpected dimensions" nobs=length(invweights1) yobs_len=length(mme1.yobs) missingPattern_type=typeof(mme1.missingPattern) missingPattern_size=(mme1.missingPattern isa AbstractArray ? size(mme1.missingPattern) : nothing)
+        end
+    end
+
     ############################################################################
     # Working Variables
     # 1) samples at current iteration (starting values default to zeros)
@@ -529,24 +561,33 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         ########################################################################
         # 3.2 Residual Variance
         ########################################################################
-        if mme1.R.estimate_variance == true
-            has_binary_trait=false #NNMM does not support binary traits now
-            if is_multi_trait1
-                mme1.R.val = sample_variance(wArray1, length(mme1.obsID),
-                                        mme1.R.df, mme1.R.scale,
-                                        invweights1,mme1.R.constraint;
-                                        binary_trait_index=has_binary_trait ? findall(x->x=="categorical(binary)", mme1.traits_type) : false)
-                Ri    = kron(inv(mme1.R.val),spdiagm(0=>invweights1))
-            else #single trait
-                if !has_categorical_trait && !has_binary_trait # fixed =1 for single categorical/binary trait
-                    mme1.ROld  = mme1.R.val
-                    mme1.R.val = sample_variance(ycorr1,length(ycorr1), mme1.R.df, mme1.R.scale, invweights1)
-                end
-            end
-            if mme1.MCMCinfo.double_precision == false
-                mme1.R.val = Float32.(mme1.R.val)
-            end
-        end
+	        if mme1.R.estimate_variance == true
+	            has_binary_trait=false #NNMM does not support binary traits now
+	            if is_multi_trait1
+	                mme1.R.val = sample_variance(wArray1, length(mme1.obsID),
+	                                        mme1.R.df, mme1.R.scale,
+	                                        invweights1,mme1.R.constraint;
+	                                        binary_trait_index=has_binary_trait ? findall(x->x=="categorical(binary)", mme1.traits_type) : false)
+	                Ri    = kron(inv(mme1.R.val),spdiagm(0=>invweights1))
+	            else #single trait
+	                if !has_categorical_trait && !has_binary_trait # fixed =1 for single categorical/binary trait
+	                    mme1.ROld  = mme1.R.val
+	                    mme1.R.val = sample_variance(ycorr1,length(ycorr1), mme1.R.df, mme1.R.scale, invweights1)
+	                end
+	            end
+	            if mme1.MCMCinfo.double_precision == false
+	                mme1.R.val = Float32.(mme1.R.val)
+	            end
+	            if mme1.R.val isa Number
+	                if !isfinite(mme1.R.val) || mme1.R.val <= 0
+	                    error("NNMM: invalid 1->2 residual variance at iter=$iter: $(mme1.R.val)")
+	                end
+	            else
+	                if !all(isfinite, mme1.R.val)
+	                    error("NNMM: non-finite 1->2 residual covariance at iter=$iter")
+	                end
+	            end
+	        end
 
 	        ########################################################################
 	        # 5. Latent Traits (NNBayes) 
@@ -620,30 +661,40 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
                     ylats_new     = candidates .* updateus + ylats_old_inc .* (.!updateus)
                 end
 
-                #step 2. update ylats with sampled latent traits
-                ylats_old[incomplete_with_yobs, :] = ylats_new
-            end
+	                #step 2. update ylats with sampled latent traits
+	                if any(x -> !isfinite(x), ylats_new)
+	                    @warn "NNMM: non-finite latent trait draw; keeping previous values for this iteration" iter=iter
+	                else
+	                    ylats_old[incomplete_with_yobs, :] = ylats_new
+	                end
+	            end
 
             # For incomplete inds without yobs, sample from the 1->2 conditional normal model only.
             if any(incomplete_no_yobs)
                 μ_ylats_inc = μ_ylats[incomplete_no_yobs, :]
                 ninc = size(μ_ylats_inc, 1)
                 T = eltype(μ_ylats_inc)
-                if mme1.R.val isa Number
-                    candidates = μ_ylats_inc .+ randn(T, ninc, ntraits) .* sqrt(T(mme1.R.val))
-                elseif mme1.R.val isa Diagonal
-                    sds = sqrt.(diag(mme1.R.val))
-                    candidates = μ_ylats_inc .+ randn(T, ninc, ntraits) .* reshape(T.(sds), 1, :)
-                else
-                    L = cholesky(Symmetric(mme1.R.val)).L
-                    candidates = μ_ylats_inc .+ randn(T, ninc, ntraits) * L'
-                end
-                ylats_old[incomplete_no_yobs, :] = candidates
-            end
-        end
+	                if mme1.R.val isa Number
+	                    candidates = μ_ylats_inc .+ randn(T, ninc, ntraits) .* sqrt(T(mme1.R.val))
+	                elseif mme1.R.val isa Diagonal
+	                    sds = sqrt.(diag(mme1.R.val))
+	                    candidates = μ_ylats_inc .+ randn(T, ninc, ntraits) .* reshape(T.(sds), 1, :)
+	                else
+	                    L = cholesky(Symmetric(mme1.R.val)).L
+	                    candidates = μ_ylats_inc .+ randn(T, ninc, ntraits) * L'
+	                end
+	                if any(x -> !isfinite(x), candidates)
+	                    error("NNMM: non-finite latent trait candidates for individuals without phenotype at iter=$iter")
+	                end
+	                ylats_old[incomplete_no_yobs, :] = candidates
+	            end
+	        end
         
-        #step 3. for individuals with partial omics data, put back the partial real omics.
-        ylats_old[mme1.missingPattern] .= ylats_old2[mme1.missingPattern]
+	        #step 3. for individuals with partial omics data, put back the partial real omics.
+	        ylats_old[mme1.missingPattern] .= ylats_old2[mme1.missingPattern]
+	        if any(x -> !isfinite(x), ylats_old)
+	            error("NNMM: non-finite latent traits after update at iter=$iter")
+	        end
     
         #update ylats (i.e., omics)
         mme1.ySparse = vec(ylats_old) #omics data, note that ylats_old is the updated omics data, the old omics data is in ylats_old2
@@ -659,15 +710,19 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         align_transformed_omics_with_phenotypes(mme2,nonlinear_function)
         #update ycorr2 (2->3): y - X*b - Σ(Z_i * α_i)
         ycorr2[:] = vec(Matrix(mme2.ySparse) - mme2.X * mme2.sol)
-        if mme2.M != 0
-            for Mi in mme2.M
-                Xomics = Mi.aligned_omics_w_phenotype
-                ycorr2 .-= Xomics * Mi.α[1]
-            end
-        end
-        #update Mi.mArray, Mi.mRinvArray, Mi.mpRinvx for 2->3
-        Mi_genotypes = convert(mme2.MCMCinfo.double_precision ? Matrix{Float64} : Matrix{Float32},
-                               mme2.M[1].aligned_omics_w_phenotype)
+	        if mme2.M != 0
+	            for Mi in mme2.M
+	                Xomics = Mi.aligned_omics_w_phenotype
+	                ycorr2 .-= Xomics * Mi.α[1]
+	            end
+	        end
+	        if any(x -> !isfinite(x), ycorr2)
+	            n_bad = count(x -> !isfinite(x), ycorr2)
+	            error("NNMM: ycorr2 contains $n_bad non-finite value(s) at iter=$iter; aborting to avoid NaN cascades.")
+	        end
+	        #update Mi.mArray, Mi.mRinvArray, Mi.mpRinvx for 2->3
+	        Mi_genotypes = convert(mme2.MCMCinfo.double_precision ? Matrix{Float64} : Matrix{Float32},
+	                               mme2.M[1].aligned_omics_w_phenotype)
         mGibbs    = GibbsMats(Mi_genotypes,invweights2)
         mme2.M[1].mArray, mme2.M[1].mRinvArray, mme2.M[1].mpRinvm  = mGibbs.xArray, mGibbs.xRinvArray, mGibbs.xpRinvx
         if debug_scale && iter <= debug_scale_iters && mme2.M != 0 && length(mme2.M) > 0
@@ -840,30 +895,52 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
         ########################################################################
         # 3.2 Residual Variance
         ########################################################################
-        if mme2.R.estimate_variance == true
-            has_binary_trait=false #NNMM does not support binary traits now
-            if is_multi_trait2
-                mme2.R.val = sample_variance(wArray2, length(mme2.obsID),
-                                        mme2.R.df, mme2.R.scale,
-                                        invweights2,mme2.R.constraint;
-                                        binary_trait_index=has_binary_trait ? findall(x->x=="categorical(binary)", mme2.traits_type) : false)
-                Ri    = kron(inv(mme2.R.val),spdiagm(0=>invweights2))
-            else #single trait
-                if !has_categorical_trait && !has_binary_trait # fixed =1 for single categorical/binary trait
-                    mme2.ROld  = mme2.R.val
-                    mme2.R.val = sample_variance(ycorr2,length(ycorr2), mme2.R.df, mme2.R.scale, invweights2)
-                end
-            end
-            if mme2.MCMCinfo.double_precision == false
-                mme2.R.val = Float32.(mme2.R.val)
-            end
-        end
+	        if mme2.R.estimate_variance == true
+	            has_binary_trait=false #NNMM does not support binary traits now
+	            if is_multi_trait2
+	                mme2.R.val = sample_variance(wArray2, length(mme2.obsID),
+	                                        mme2.R.df, mme2.R.scale,
+	                                        invweights2,mme2.R.constraint;
+	                                        binary_trait_index=has_binary_trait ? findall(x->x=="categorical(binary)", mme2.traits_type) : false)
+	                Ri    = kron(inv(mme2.R.val),spdiagm(0=>invweights2))
+	            else #single trait
+	                if !has_categorical_trait && !has_binary_trait # fixed =1 for single categorical/binary trait
+	                    mme2.ROld  = mme2.R.val
+	                    mme2.R.val = sample_variance(ycorr2,length(ycorr2), mme2.R.df, mme2.R.scale, invweights2)
+	                end
+	            end
+	            if mme2.MCMCinfo.double_precision == false
+	                mme2.R.val = Float32.(mme2.R.val)
+	            end
+	            if mme2.R.val isa Number
+	                if !isfinite(mme2.R.val) || mme2.R.val <= 0
+	                    error("NNMM: invalid 2->3 residual variance at iter=$iter: $(mme2.R.val)")
+	                end
+	            else
+	                if !all(isfinite, mme2.R.val)
+	                    error("NNMM: non-finite 2->3 residual covariance at iter=$iter")
+	                end
+	            end
+	        end
 
 
-        #update σ2_yobs, σ2_weightsNN, and weights_NN
-        mme1.σ2_yobs = mme2.R.val
-        mme1.σ2_weightsNN = mme2.M[1].G.val
-        mme1.weights_NN = mme2.M[1].α[1]
+	        #update σ2_yobs, σ2_weightsNN, and weights_NN
+	        mme1.σ2_yobs = mme2.R.val
+	        mme1.σ2_weightsNN = mme2.M[1].G.val
+	        mme1.weights_NN = mme2.M[1].α[1]
+	        if mme1.σ2_yobs isa Number
+	            if !isfinite(mme1.σ2_yobs) || mme1.σ2_yobs <= 0
+	                error("NNMM: invalid σ2_yobs propagated from 2->3 at iter=$iter: $(mme1.σ2_yobs)")
+	            end
+	        end
+	        if mme1.σ2_weightsNN isa Number
+	            if !isfinite(mme1.σ2_weightsNN) || mme1.σ2_weightsNN <= 0
+	                error("NNMM: invalid σ2_weightsNN propagated from 2->3 at iter=$iter: $(mme1.σ2_weightsNN)")
+	            end
+	        end
+	        if any(x -> !isfinite(x), mme1.weights_NN)
+	            error("NNMM: non-finite NN weights propagated from 2->3 at iter=$iter")
+	        end
 
         ########################################################################
         # 3.1 Save MCMC samples
