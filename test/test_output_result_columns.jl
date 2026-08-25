@@ -78,6 +78,10 @@ using NNMM
 
     @test haskey(result, "marker effects geno")
     @test haskey(result, "marker effects omics")
+    @test haskey(result, "fixed effects")
+    @test size(result["fixed effects"], 1) == 1
+    @test result["fixed effects"].Effect == ["intercept"]
+    @test result["fixed effects"].Estimate == [1.25]
     @test propertynames(result["marker effects geno"]) == expected_columns
     @test propertynames(result["marker effects omics"]) == expected_columns
     @test result["marker effects geno"].Trait == ["trait1", "trait1"]

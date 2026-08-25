@@ -20,12 +20,16 @@ using Random
         omics[!, "o1b"] = randn(length(ids))
         omics[!, "o2a"] = randn(length(ids))
         omics[!, "o2b"] = randn(length(ids))
+        omics[!, "o3a"] = randn(length(ids))
+        omics[!, "o3b"] = randn(length(ids))
         omics_path = joinpath(tmpdir, "omics.csv")
         CSV.write(omics_path, omics; missingstring="NA")
 
         pheno = DataFrame(
             ID=ids,
-            y=0.8 .* omics.o1a .- 0.4 .* omics.o2b .+ 0.1 .* randn(length(ids)),
+            age=collect(21.0:44.0),
+            y=0.8 .* omics.o1a .- 0.4 .* omics.o2b .+ 0.2 .* omics.o3a .+
+              0.03 .* collect(21.0:44.0) .+ 0.1 .* randn(length(ids)),
         )
         pheno_path = joinpath(tmpdir, "pheno.csv")
         CSV.write(pheno_path, pheno; missingstring="NA")
@@ -33,10 +37,12 @@ using Random
         groups = Dict(
             "omics1" => ["o1a", "o1b"],
             "omics2" => ["o2a", "o2b"],
+            "omics3" => ["o3a", "o3b"],
         )
         class_priors = Dict(
             "omics1" => (method="BayesC", Pi=0.75, estimatePi=false),
             "omics2" => (method="BayesC", Pi=0.25, estimatePi=false),
+            "omics3" => (method="BayesC", Pi=0.50, estimatePi=false),
             "geno" => (method="BayesC", Pi=0.0, estimatePi=false),
         )
 
@@ -50,15 +56,16 @@ using Random
                 from_layer_name="geno",
                 to_layer_name="omics",
                 equation="omics = intercept + geno",
-                traits=vcat(groups["omics1"], groups["omics2"]),
+                traits=vcat(groups["omics1"], groups["omics2"], groups["omics3"]),
                 method="BayesC",
                 omics_groups=groups,
             ),
             Equation(
                 from_layer_name="omics",
                 to_layer_name="phenotypes",
-                equation="phenotypes = intercept + omics1 + omics2 + geno",
+                equation="phenotypes = intercept + age + omics1 + omics2 + omics3 + geno",
                 traits=["y"],
+                covariate=["age"],
                 class_priors=class_priors,
                 omics_groups=groups,
                 activation_function="linear",
@@ -80,6 +87,13 @@ using Random
 
         @test haskey(result, "EBV_NonLinear")
         @test haskey(result, "EPV_Output_NonLinear")
+        @test haskey(result, "fixed effects 1->2")
+        @test haskey(result, "fixed effects 2->3")
+        @test Set(result["fixed effects 2->3"].Effect) == Set(["intercept", "age"])
+        @test all(isfinite, result["fixed effects 2->3"].Estimate)
+        @test isfile(joinpath(tmpdir, "out", "fixed_effects_1_to_2.csv"))
+        @test isfile(joinpath(tmpdir, "out", "fixed_effects_2_to_3.csv"))
+        @test haskey(result, "marker effects omics3")
         @test nrow(result["EBV_NonLinear"]) == length(ids)
     end
 end

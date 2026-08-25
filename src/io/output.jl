@@ -124,6 +124,17 @@ function output_result(mme,output_folder,
   output = Dict()
   location_parameters = reformat2dataframe([getNames(mme) solMean sqrt.(abs.(solMean2 .- solMean .^2))])
   output["location parameters"] = location_parameters
+  # Location parameters contain both fixed and non-marker random effects.  Expose
+  # the fixed-effect subset explicitly so callers do not need to infer effect
+  # types from the model internals.
+  fixed_effect_mask = Bool[]
+  for term in mme.modelTerms
+      append!(fixed_effect_mask, fill(term.random_type == "fixed", length(term.names)))
+  end
+  if length(fixed_effect_mask) != nrow(location_parameters)
+      error("NNMM: location-parameter metadata is inconsistent with the posterior solution vector.")
+  end
+  output["fixed effects"] = location_parameters[fixed_effect_mask, :]
   if mme.MCMCinfo.RRM == false
       output["residual variance"]   = matrix2dataframe(string.(mme.lhsVec),meanVare,meanVare2)
   else

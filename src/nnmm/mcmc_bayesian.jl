@@ -1261,6 +1261,15 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
                           mme2.solMean2,mme2.meanVare2,
                           mme2.pedTrmVec!=0 ? mme2.G0Mean2 : false)
     mme2.output_ID = output_ID2
+
+    # Keep the historical unqualified keys (which describe 1->2), and add
+    # stage-qualified keys so fixed effects estimated in 2->3 are not lost.
+    output["location parameters 1->2"] = output["location parameters"]
+    output["fixed effects 1->2"] = output["fixed effects"]
+    output["location parameters 2->3"] = output2["location parameters"]
+    output["fixed effects 2->3"] = output2["fixed effects"]
+    CSV.write(joinpath(output_folder, "fixed_effects_1_to_2.csv"), output["fixed effects 1->2"])
+    CSV.write(joinpath(output_folder, "fixed_effects_2_to_3.csv"), output["fixed effects 2->3"])
     for (key,value) in output2
         if startswith(key, "marker effects ")
             output[key] = value
