@@ -149,7 +149,14 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
             for (j, fid) in enumerate(string.(Mi.featureID))
                 if haskey(middle_trait_index, fid)
                     val = Mi.G.val
-                    variances[middle_trait_index[fid]] = val isa Number ? Float64(val) : Float64(val[j, j])
+                    variance = if val isa Number
+                        val
+                    elseif val isa AbstractVector
+                        val[j] # BayesA/B store a separate variance for each feature.
+                    else
+                        val[j, j]
+                    end
+                    variances[middle_trait_index[fid]] = Float64(variance)
                 end
             end
         end

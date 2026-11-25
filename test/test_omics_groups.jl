@@ -1,6 +1,7 @@
 using DataFrames
 using CSV
 using Random
+using DelimitedFiles
 
 @testset "Grouped omics marker classes" begin
     Random.seed!(2026)
@@ -95,5 +96,74 @@ using Random
         @test isfile(joinpath(tmpdir, "out", "fixed_effects_2_to_3.csv"))
         @test haskey(result, "marker effects omics3")
         @test nrow(result["EBV_NonLinear"]) == length(ids)
+
+        @testset "BayesA/B locus-specific variances with missing omics" begin
+            # Mix locus-specific and shared variances in the same model, with
+            # multiple features per class so an incorrect matrix index fails.
+            mixed_priors = Dict(
+                "omics1" => (method="BayesA", estimatePi=false),
+                "omics2" => (method="BayesB", Pi=0.25, estimatePi=false),
+                "omics3" => (method="BayesC", Pi=0.50, estimatePi=false),
+            )
+            omics_missing = allowmissing(copy(omics))
+            omics_missing[1:3, :o1a] .= missing
+            omics_missing[4:6, :o2b] .= missing
+            omics_missing[21:24, Not(:ID)] .= missing
+            pheno_missing = allowmissing(copy(pheno), :y)
+            pheno_missing[21:24, :y] .= missing
+            missing_omics_path = joinpath(tmpdir, "omics_missing.csv")
+            missing_pheno_path = joinpath(tmpdir, "pheno_missing.csv")
+            CSV.write(missing_omics_path, omics_missing; missingstring="NA")
+            CSV.write(missing_pheno_path, pheno_missing; missingstring="NA")
+
+            mixed_layers = [
+                Layer(layer_name="geno", data_path=[geno_path]),
+                Layer(layer_name="omics", data_path=missing_omics_path, missing_value="NA"),
+                Layer(layer_name="phenotypes", data_path=missing_pheno_path, missing_value="NA"),
+            ]
+            mixed_equations = [
+                Equation(
+                    from_layer_name="geno", to_layer_name="omics",
+                    equation="omics = intercept + geno",
+                    traits=vcat(groups["omics1"], groups["omics2"], groups["omics3"]),
+                ),
+                Equation(
+                    from_layer_name="omics", to_layer_name="phenotypes",
+                    equation="phenotypes = intercept + age + omics1 + omics2 + omics3",
+                    traits=["y"], covariate=["age"],
+                    class_priors=mixed_priors, omics_groups=groups,
+                ),
+            ]
+            mixed_outdir = joinpath(tmpdir, "out_mixed_methods")
+            mixed_result = runNNMM(
+                mixed_layers,
+                mixed_equations;
+                chain_length=4,
+                burnin=0,
+                output_samples_frequency=1,
+                output_prediction_frequency=1,
+                printout_model_info=false,
+                printout_frequency=10^9,
+                output_folder=mixed_outdir,
+                seed=2026,
+            )
+
+            @test nrow(mixed_result["EBV_NonLinear"]) == length(ids)
+            @test nrow(mixed_result["EPV_Output_NonLinear"]) == length(ids)
+            @test all(isfinite, mixed_result["EBV_NonLinear"].EBV)
+            @test all(isfinite, mixed_result["EPV_Output_NonLinear"].EPV)
+            for group in ("omics1", "omics2", "omics3")
+                effects = mixed_result["marker effects " * group]
+                @test Set(effects.Marker_ID) == Set(groups[group])
+                @test all(isfinite, effects.Estimate)
+            end
+
+            variances = readdlm(joinpath(mixed_outdir, "MCMC_samples_layer2_effect_variance.txt"), ',')
+            @test size(variances) == (4, 6)
+            @test all(x -> isfinite(x) && x > 0, variances)
+            @test any(variances[:, 1] .!= variances[:, 2]) # BayesA: per feature
+            @test any(variances[:, 3] .!= variances[:, 4]) # BayesB: per feature
+            @test variances[:, 5] == variances[:, 6]      # BayesC: shared within class
+        end
     end
 end
