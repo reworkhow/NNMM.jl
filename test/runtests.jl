@@ -38,9 +38,15 @@ using NNMM
     # Post-analysis functions (GWAS, getEBV)
     include("test_post_analysis.jl")
 
+    # output_result marker/omic effect output schema
+    include("test_output_result_columns.jl")
+
     # Internal debug invariants / regression checks
     include("test_invariants.jl")
 
     # Layer 1 → Layer 3 skip connection (multi-class 2->3)
     include("test_skip_connection.jl")
+
+    # Named omics groups as separate 2->3 marker classes
+    include("test_omics_groups.jl")
 end

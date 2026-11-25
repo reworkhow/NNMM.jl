@@ -117,6 +117,86 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
                            (Mi isa Genotypes ? Mi.genotypes :
                             error("NNMM: unsupported marker class in 2->3: $(typeof(Mi))"))
 
+    middle_trait_index = Dict(string(mme1.lhsVec[i]) => i for i in 1:mme1.nModels)
+
+    function omics_classes_23()
+        mme2.M == 0 ? Omics[] : [Mi for Mi in mme2.M if Mi isa Omics]
+    end
+
+    function middle_weights_23()
+        T = Float64
+        for Mi in omics_classes_23()
+            if Mi.α != false && !isempty(Mi.α)
+                T = eltype(Mi.α[1])
+                break
+            end
+        end
+        weights = zeros(T, mme1.nModels)
+        for Mi in omics_classes_23()
+            for (j, fid) in enumerate(string.(Mi.featureID))
+                if !haskey(middle_trait_index, fid)
+                    error("NNMM: omics class '$(Mi.name)' includes '$fid', but it is not a latent trait in 1->2.")
+                end
+                weights[middle_trait_index[fid]] = Mi.α[1][j]
+            end
+        end
+        return weights
+    end
+
+    function middle_weight_variances_23()
+        variances = zeros(Float64, mme1.nModels)
+        for Mi in omics_classes_23()
+            for (j, fid) in enumerate(string.(Mi.featureID))
+                if haskey(middle_trait_index, fid)
+                    val = Mi.G.val
+                    variance = if val isa Number
+                        val
+                    elseif val isa AbstractVector
+                        val[j] # BayesA/B store a separate variance for each feature.
+                    else
+                        val[j, j]
+                    end
+                    variances[middle_trait_index[fid]] = Float64(variance)
+                end
+            end
+        end
+        return variances
+    end
+
+    function assign_latent_traits_to_omics_classes!(ylats)
+        for Mi in omics_classes_23()
+            colidx = [middle_trait_index[string(fid)] for fid in Mi.featureID]
+            Mi.data[!, Mi.featureID] = ylats[:, colidx]
+        end
+        return nothing
+    end
+
+    function refresh_omics_gibbs_mats_23!(invweights)
+        for Mi in omics_classes_23()
+            Mi_genotypes = convert(mme2.MCMCinfo.double_precision ? Matrix{Float64} : Matrix{Float32},
+                                   marker_matrix_23(Mi))
+            mGibbs = GibbsMats(Mi_genotypes, invweights)
+            Mi.mArray, Mi.mRinvArray, Mi.mpRinvm = mGibbs.xArray, mGibbs.xRinvArray, mGibbs.xpRinvx
+        end
+        return nothing
+    end
+
+    function middle_matrix_phenotype_order_23()
+        omics_classes = omics_classes_23()
+        isempty(omics_classes) && error("NNMM: no omics classes found in 2->3.")
+        base = omics_classes[1].aligned_omics_w_phenotype
+        X = zeros(eltype(base), size(base, 1), mme1.nModels)
+        for Mi in omics_classes
+            Xi = Mi.aligned_omics_w_phenotype
+            for (j, fid) in enumerate(string.(Mi.featureID))
+                if haskey(middle_trait_index, fid)
+                    X[:, middle_trait_index[fid]] = Xi[:, j]
+                end
+            end
+        end
+        return X
+    end
+
     ############################################################################
     # Working Variables
     # 1) samples at current iteration (starting values default to zeros)
@@ -416,7 +496,7 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
 
     # Write header for EPV_NonLinear file (IDs of phenotyped individuals)
     if output_samples_frequency != 0 && nonlinear_function != false && mme2.M != 0 && length(mme2.M) > 0
-        epv_ids = mme2.M[1].aligned_obsID_w_phenotype
+        epv_ids = omics_classes_23()[1].aligned_obsID_w_phenotype
         writedlm(outfile["EPV_NonLinear"], transubstrarr(epv_ids), ',')
         if mme1.output_ID != 0 && haskey(outfile, "EPV_Output_NonLinear")
             writedlm(outfile["EPV_Output_NonLinear"], transubstrarr(mme1.output_ID), ',')
@@ -428,13 +508,14 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
     # rebuilding and re-allocating sparse matrices each iteration.
     Z_yobs_from_omics = nothing
     if nonlinear_function != false && mme2.M != 0 && length(mme2.M) > 0
-        Z_yobs_from_omics = mkmat_incidence_factor(mme2.obsID, mme2.M[1].obsID)
+        first_omics = omics_classes_23()[1]
+        Z_yobs_from_omics = mkmat_incidence_factor(mme2.obsID, first_omics.obsID)
         Z_yobs_from_omics = map(mme1.MCMCinfo.double_precision ? Float64 : Float32, Z_yobs_from_omics)
     end
 
     Z_obs_from_layer2_omics = nothing
-    if Z_yobs_from_omics !== nothing && (mme1.obsID != mme2.M[1].obsID)
-        Z_obs_from_layer2_omics = mkmat_incidence_factor(mme1.obsID, mme2.M[1].obsID)
+    if Z_yobs_from_omics !== nothing && (mme1.obsID != omics_classes_23()[1].obsID)
+        Z_obs_from_layer2_omics = mkmat_incidence_factor(mme1.obsID, omics_classes_23()[1].obsID)
         Z_obs_from_layer2_omics = map(mme1.MCMCinfo.double_precision ? Float64 : Float32, Z_obs_from_layer2_omics)
     end
 
@@ -798,7 +879,7 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
 
         #update data for 2->3
         #update omics data
-        mme2.M[1].data[!,mme2.M[1].featureID] = ylats_old
+        assign_latent_traits_to_omics_classes!(ylats_old)
 	        #update aligned transformed omics data (g(z))
 	        align_transformed_omics_with_phenotypes(mme2,nonlinear_function)
 	        #update ycorr2 (2->3): y - X*b - Σ(Z_i * α_i)
@@ -813,12 +894,9 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
 		            error("NNMM: ycorr2 contains $n_bad non-finite value(s) at iter=$iter; aborting to avoid NaN cascades.")
 	        end
 	        #update Mi.mArray, Mi.mRinvArray, Mi.mpRinvx for 2->3
-	        Mi_genotypes = convert(mme2.MCMCinfo.double_precision ? Matrix{Float64} : Matrix{Float32},
-	                               marker_matrix_23(mme2.M[1]))
-	        mGibbs    = GibbsMats(Mi_genotypes,invweights2)
-	        mme2.M[1].mArray, mme2.M[1].mRinvArray, mme2.M[1].mpRinvm  = mGibbs.xArray, mGibbs.xRinvArray, mGibbs.xpRinvx
+	        refresh_omics_gibbs_mats_23!(invweights2)
         if debug_scale && iter <= debug_scale_iters && mme2.M != 0 && length(mme2.M) > 0
-            Mi_dbg = mme2.M[1]
+            Mi_dbg = omics_classes_23()[1]
             X_dbg = Mi_dbg.aligned_omics_w_phenotype
             α_dbg = Mi_dbg.α[1]
             println("\n[NNMM_DEBUG_SCALE iter=$(iter)] pre-2->3:")
@@ -911,7 +989,7 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
                     end
                 end
                 if debug_scale && iter <= debug_scale_iters
-                    X_dbg = mme2.M[1].aligned_omics_w_phenotype
+                    X_dbg = marker_matrix_23(Mi)
                     α_dbg = Mi.α[1]
                     pred_dbg = X_dbg * α_dbg
                     println("[NNMM_DEBUG_SCALE iter=$(iter)] post-2->3 marker effects:")
@@ -1013,8 +1091,8 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
 
 	        #update σ2_yobs, σ2_weightsNN, and weights_NN
 	        mme1.σ2_yobs = mme2.R.val
-	        mme1.σ2_weightsNN = mme2.M[1].G.val
-	        mme1.weights_NN = mme2.M[1].α[1]
+	        mme1.σ2_weightsNN = middle_weight_variances_23()
+	        mme1.weights_NN = middle_weights_23()
 	        if mme1.σ2_yobs isa Number
 	            if !isfinite(mme1.σ2_yobs) || mme1.σ2_yobs <= 0
 	                error("NNMM: invalid σ2_yobs propagated from 2->3 at iter=$iter: $(mme1.σ2_yobs)")
@@ -1036,6 +1114,7 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
 	            #MCMC samples from posterior distributions
 	            nsamples       = (iter-burnin)/output_samples_frequency
 	            output_posterior_mean_variance(mme1,nsamples)
+	            output_posterior_mean_variance(mme2,nsamples)
 	            #mean and variance of posterior distribution
 	            if mme1.pedTrmVec!=0
 	                polygenic_effects_variance = inv(mme1.rndTrmVec[polygenic_pos].Gi.val) 
@@ -1070,7 +1149,7 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
             # Save Layer 2 variances
             writedlm(outfile["layer2_residual_variance"], mme2.R.val', ',')
             if mme2.M != 0 && length(mme2.M) > 0
-                writedlm(outfile["layer2_effect_variance"], mme2.M[1].G.val', ',')
+                writedlm(outfile["layer2_effect_variance"], middle_weight_variances_23()', ',')
             end
 	        end
 
@@ -1085,7 +1164,7 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
 	            # Save EPV (Estimated Phenotypic Value) using OBSERVED omics.
 	            # EPV = activation(observed_omics) * weights_NN (+ genotype-skip terms if present)
 	            if mme1.nonlinear_function != false && mme2.M != 0 && length(mme2.M) > 0 && haskey(outfile, "EPV_NonLinear")
-	                observed_omics = mme2.M[1].aligned_omics_w_phenotype
+	                observed_omics = middle_matrix_phenotype_order_23()
 	                if mme1.is_activation_fcn == true
 	                    # `aligned_omics_w_phenotype` is already activation-transformed (see align_transformed_omics_with_phenotypes),
 	                    # so do NOT apply the activation function a second time.
@@ -1181,5 +1260,27 @@ function nnmm_MCMC_BayesianAlphabet(mme1,df1,mme2,df2)
                          mme1.pedTrmVec!=0 ? mme1.G0Mean : false,
                          mme1.solMean2,mme1.meanVare2,
                          mme1.pedTrmVec!=0 ? mme1.G0Mean2 : false)
+    output_ID2 = mme2.output_ID
+    mme2.output_ID = 0
+    output2=output_result(mme2,output_folder,
+                          mme2.solMean,mme2.meanVare,
+                          mme2.pedTrmVec!=0 ? mme2.G0Mean : false,
+                          mme2.solMean2,mme2.meanVare2,
+                          mme2.pedTrmVec!=0 ? mme2.G0Mean2 : false)
+    mme2.output_ID = output_ID2
+
+    # Keep the historical unqualified keys (which describe 1->2), and add
+    # stage-qualified keys so fixed effects estimated in 2->3 are not lost.
+    output["location parameters 1->2"] = output["location parameters"]
+    output["fixed effects 1->2"] = output["fixed effects"]
+    output["location parameters 2->3"] = output2["location parameters"]
+    output["fixed effects 2->3"] = output2["fixed effects"]
+    CSV.write(joinpath(output_folder, "fixed_effects_1_to_2.csv"), output["fixed effects 1->2"])
+    CSV.write(joinpath(output_folder, "fixed_effects_2_to_3.csv"), output["fixed effects 2->3"])
+    for (key,value) in output2
+        if startswith(key, "marker effects ")
+            output[key] = value
+        end
+    end
     return output
 end

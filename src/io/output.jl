@@ -124,6 +124,17 @@ function output_result(mme,output_folder,
   output = Dict()
   location_parameters = reformat2dataframe([getNames(mme) solMean sqrt.(abs.(solMean2 .- solMean .^2))])
   output["location parameters"] = location_parameters
+  # Location parameters contain both fixed and non-marker random effects.  Expose
+  # the fixed-effect subset explicitly so callers do not need to infer effect
+  # types from the model internals.
+  fixed_effect_mask = Bool[]
+  for term in mme.modelTerms
+      append!(fixed_effect_mask, fill(term.random_type == "fixed", length(term.names)))
+  end
+  if length(fixed_effect_mask) != nrow(location_parameters)
+      error("NNMM: location-parameter metadata is inconsistent with the posterior solution vector.")
+  end
+  output["fixed effects"] = location_parameters[fixed_effect_mask, :]
   if mme.MCMCinfo.RRM == false
       output["residual variance"]   = matrix2dataframe(string.(mme.lhsVec),meanVare,meanVare2)
   else
@@ -138,16 +149,19 @@ function output_result(mme,output_folder,
 
   if mme.M != 0
       for Mi in mme.M
+         marker_ids = hasproperty(Mi, :markerID) ? Mi.markerID :
+                      (hasproperty(Mi, :featureID) ? Mi.featureID :
+                       error("Marker/effect IDs are not available for $(typeof(Mi))."))
          ntraits_geno = mme.MCMCinfo.RRM == false ? Mi.ntraits : length(mme.lhsVec)
          traiti      = 1
-         whichtrait  = fill(string(mme.lhsVec[traiti]),length(Mi.markerID))
-         whichmarker = Mi.markerID
+         whichtrait  = fill(string(mme.lhsVec[traiti]),length(marker_ids))
+         whichmarker = marker_ids
          whicheffect = Mi.meanAlpha[traiti]
          whicheffectsd = sqrt.(abs.(Mi.meanAlpha2[traiti] .- Mi.meanAlpha[traiti] .^2))
          whichdelta    = Mi.meanDelta[traiti]
           for traiti in 2:ntraits_geno
-                whichtrait     = vcat(whichtrait,fill(string(mme.lhsVec[traiti]),length(Mi.markerID)))
-                whichmarker    = vcat(whichmarker,Mi.markerID)
+                whichtrait     = vcat(whichtrait,fill(string(mme.lhsVec[traiti]),length(marker_ids)))
+                whichmarker    = vcat(whichmarker,marker_ids)
                 whicheffect    = vcat(whicheffect,Mi.meanAlpha[traiti])
                 whicheffectsd  = vcat(whicheffectsd,sqrt.(abs.(Mi.meanAlpha2[traiti] .- Mi.meanAlpha[traiti] .^2)))
                 whichdelta     = vcat(whichdelta,Mi.meanDelta[traiti])

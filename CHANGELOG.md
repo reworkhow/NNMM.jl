@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Fixed BayesA/B omics-effect variance indexing for combined and grouped Layer 2→3 models.
+- Kept Julia 1.9 CI coverage on Ubuntu 24.04 to avoid startup errors on newer runners.
 - Fixed variance estimation bug when using train/test split with missing phenotypes
   - `sample_variance` now uses effective sample size (n_effective) instead of total individuals (n_total)
   - Individuals with `invweights=0` (prediction-only) are correctly excluded from variance degrees of freedom
